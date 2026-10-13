@@ -1,9 +1,9 @@
 name: Build
 
-# РџСЂРѕРІРµСЂРєР° СЃР±РѕСЂРєРё РЅР° РєР°Р¶РґРѕРј РїСѓС€Рµ Рё PR. Р РµР»РёР·С‹ СЃРѕР±РёСЂР°РµС‚ release.yml РїРѕ С‚РµРіСѓ.
+# Проверка сборки на каждом пуше и PR. Релизы собирает release.yml по тегу.
 on:
   push:
-    # РћР±Рµ СЂР°Р±РѕС‡РёРµ РІРµС‚РєРё: dev вЂ” СЂР°Р·СЂР°Р±РѕС‚РєР°, release вЂ” С‚Рѕ, С‡С‚Рѕ СѓРµРґРµС‚ РІ СЂРµР»РёР·.
+    # Обе рабочие ветки: dev — разработка, release — то, что уедет в релиз.
     branches: [dev, release]
   pull_request:
   workflow_dispatch:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build:
-    name: РЎР±РѕСЂРєР° debug APK
+    name: Сборка debug APK
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -24,10 +24,10 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # РќРµ android-actions/setup-android: РѕРЅ РґС‘СЂРіР°РµС‚ `sdkmanager tools`, Р° РїР°РєРµС‚
-      # tools СѓРґР°Р»С‘РЅ РёР· СЂРµРїРѕР·РёС‚РѕСЂРёСЏ Google Рё С€Р°Рі РІР°Р»РёС‚ СЃР±РѕСЂРєСѓ. РќР° РѕР±СЂР°Р·Рµ runner
-      # cmdline-tools СѓР¶Рµ РµСЃС‚СЊ вЂ” РїСЂРёРЅРёРјР°РµРј licenses, Р° РЅРµРґРѕСЃС‚Р°СЋС‰РёРµ РєРѕРјРїРѕРЅРµРЅС‚С‹
-      # (platform 36.1, build-tools) РґРѕСЃС‚Р°РІРёС‚ СЃР°Рј AGP.
+      # Не android-actions/setup-android: он дёргает `sdkmanager tools`, а пакет
+      # tools удалён из репозитория Google и шаг валит сборку. На образе runner
+      # cmdline-tools уже есть — принимаем licenses, а недостающие компоненты
+      # (platform 36.1, build-tools) доставит сам AGP.
       - name: Android SDK
         run: |
           SDKMANAGER="$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | tail -1)"
@@ -37,15 +37,14 @@ jobs:
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # Р®РЅРёС‚-С‚РµСЃС‚С‹ (СЌРєРѕРЅРѕРјРёСЏ, С„РѕСЂРјР°С‚ СЂР°Р·РјРµСЂРѕРІ) + СЃР±РѕСЂРєР° APK.
-      - name: РўРµСЃС‚С‹ Рё СЃР±РѕСЂРєР°
+      # Юнит-тесты (экономия, формат размеров) + сборка APK.
+      - name: Тесты и сборка
         run: ./gradlew :app:testDebugUnitTest :app:assembleDebug
 
-      # РђСЂС‚РµС„Р°РєС‚ СѓРґРѕР±РЅРѕ С‚СЏРЅСѓС‚СЊ РёР· РІРєР»Р°РґРєРё Actions, РЅРµ РґРѕР¶РёРґР°СЏСЃСЊ СЂРµР»РёР·Р°.
-      - name: РџСЂРёР»РѕР¶РёС‚СЊ APK
+      # Артефакт удобно тянуть из вкладки Actions, не дожидаясь релиза.
+      - name: Приложить APK
         uses: actions/upload-artifact@v4
         with:
           name: eBrake-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
-

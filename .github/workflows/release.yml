@@ -1,16 +1,16 @@
 name: Release
 
-# Р РµР»РёР· = С‚РµРі РІРёРґР° v1.2.0. Workflow СЃРѕР±РёСЂР°РµС‚ РїРѕРґРїРёСЃР°РЅРЅС‹Р№ APK Рё РІРµС€Р°РµС‚ РµРіРѕ
-# РІ GitHub Releases, РѕС‚РєСѓРґР° РµРіРѕ Рё РєР°С‡Р°СЋС‚.
+# Релиз = тег вида v0.1.0. Workflow собирает подписанный APK и вешает его
+# в GitHub Releases, откуда его и качают.
 on:
   push:
     tags: ['v*']
-  # Р СѓС‡РЅРѕР№ Р·Р°РїСѓСЃРє Р±РµР· С‚РµРіР° вЂ” С‡С‚РѕР±С‹ РїРµСЂРµСЃРѕР±СЂР°С‚СЊ APK С‚РѕРіРѕ Р¶Рµ С‚РµРіР°:
-  # Actions в†’ Release в†’ Run workflow.
+  # Ручной запуск без тега — чтобы пересобрать APK того же тега:
+  # Actions → Release → Run workflow.
   workflow_dispatch:
     inputs:
       tag:
-        description: 'РўРµРі, Рє РєРѕС‚РѕСЂРѕРјСѓ РїСЂРёРІСЏР·Р°С‚СЊ СЃР±РѕСЂРєСѓ (РЅР°РїСЂРёРјРµСЂ v0.1.0)'
+        description: 'Тег, к которому привязать сборку (например v0.1.0)'
         required: true
 
 permissions:
@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   build:
-    name: РЎР±РѕСЂРєР° Рё РїСѓР±Р»РёРєР°С†РёСЏ APK
+    name: Сборка и публикация APK
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -29,10 +29,10 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # РќРµ android-actions/setup-android: РѕРЅ РґС‘СЂРіР°РµС‚ `sdkmanager tools`, Р° РїР°РєРµС‚
-      # tools СѓРґР°Р»С‘РЅ РёР· СЂРµРїРѕР·РёС‚РѕСЂРёСЏ Google Рё С€Р°Рі РІР°Р»РёС‚ СЃР±РѕСЂРєСѓ. РќР° РѕР±СЂР°Р·Рµ runner
-      # cmdline-tools СѓР¶Рµ РµСЃС‚СЊ вЂ” РїСЂРёРЅРёРјР°РµРј licenses, Р° РЅРµРґРѕСЃС‚Р°СЋС‰РёРµ РєРѕРјРїРѕРЅРµРЅС‚С‹
-      # (platform 36.1, build-tools) РґРѕСЃС‚Р°РІРёС‚ СЃР°Рј AGP.
+      # Не android-actions/setup-android: он дёргает `sdkmanager tools`, а пакет
+      # tools удалён из репозитория Google и шаг валит сборку. На образе runner
+      # cmdline-tools уже есть — принимаем licenses, а недостающие компоненты
+      # (platform 36.1, build-tools) доставит сам AGP.
       - name: Android SDK
         run: |
           SDKMANAGER="$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | tail -1)"
@@ -42,38 +42,38 @@ jobs:
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # РљР»СЋС‡ РїРѕРґРїРёСЃРё Р»РµР¶РёС‚ РІ Secrets. Р‘РµР· РЅРµРіРѕ release СЃРѕР±РµСЂС‘С‚СЃСЏ РїРѕРґ debug-РєР»СЋС‡:
-      # APK СЃРєР°С‡РёРІР°РµС‚СЃСЏ Рё СЃС‚Р°РІРёС‚СЃСЏ, РЅРѕ РЅРµ РѕР±РЅРѕРІР»СЏРµС‚ СЂР°РЅРµРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅРЅСѓСЋ РІРµСЂСЃРёСЋ.
-      - name: Р’РѕСЃСЃС‚Р°РЅРѕРІРёС‚СЊ РєР»СЋС‡ РїРѕРґРїРёСЃРё
+      # Ключ подписи лежит в Secrets. Без него release соберётся под debug-ключ:
+      # APK скачивается и ставится, но не обновляет ранее установленную версию.
+      - name: Восстановить ключ подписи
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          # РЎРµРєСЂРµС‚Р° РЅРµС‚ в†’ РїРµСЂРµРјРµРЅРЅС‹Рµ РѕСЃС‚Р°СЋС‚СЃСЏ РїСѓСЃС‚С‹РјРё, Рё build.gradle.kts СЃР°Рј
-          # РѕС‚РєР°С‚РёС‚СЃСЏ РЅР° debug-РїРѕРґРїРёСЃСЊ (release РЅРµ РґРѕР»Р¶РµРЅ РїР°РґР°С‚СЊ РёР·-Р·Р° РєР»СЋС‡Р°).
+          # Секрета нет → переменные остаются пустыми, и build.gradle.kts сам
+          # откатится на debug-подпись (release не должен падать из-за ключа).
           if [ -n "$KEYSTORE_B64" ]; then
             echo "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/release.jks"
             echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
-            echo "РџРѕРґРїРёСЃСЊ: release-РєР»СЋС‡ РёР· Secrets."
+            echo "Подпись: release-ключ из Secrets."
           else
-            echo "РЎРµРєСЂРµС‚Р° ANDROID_KEYSTORE_BASE64 РЅРµС‚ вЂ” СЃРѕР±РёСЂР°РµРј РїРѕРґ debug-РєР»СЋС‡."
+            echo "Секрета ANDROID_KEYSTORE_BASE64 нет — собираем под debug-ключ."
           fi
 
-      - name: РћРїСЂРµРґРµР»РёС‚СЊ РІРµСЂСЃРёСЋ
+      - name: Определить версию
         id: ver
         run: |
           TAG="${{ inputs.tag || github.ref_name }}"
           echo "tag=${TAG#v}" >> "$GITHUB_OUTPUT"
 
-      - name: РўРµСЃС‚С‹ Рё СЃР±РѕСЂРєР° release APK
+      - name: Тесты и сборка release APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew :app:testDebugUnitTest :app:assembleRelease
 
-      # РРјСЏ С„Р°Р№Р»Р° = РІРµСЂСЃРёСЏ РёР· С‚РµРіР°: РІ Releases РІРёРґРЅРѕ, С‡С‚Рѕ РєР°С‡Р°РµС€СЊ, Рё СЃС‚Р°СЂС‹Рµ
-      # РІРµСЂСЃРёРё РЅРµ РїРµСЂРµС‚РёСЂР°СЋС‚ РґСЂСѓРі РґСЂСѓРіР°.
-      - name: РџРѕРґРіРѕС‚РѕРІРёС‚СЊ Р°СЂС‚РµС„Р°РєС‚
+      # Имя файла = версия из тега: в Releases видно, что качаешь, и старые
+      # версии не перетирают друг друга.
+      - name: Подготовить артефакт
         id: apk
         run: |
           VERSION="${{ steps.ver.outputs.tag }}"
@@ -81,11 +81,11 @@ jobs:
           DST="eBrake-${VERSION}.apk"
           cp "$SRC" "$DST"
           echo "name=$DST" >> "$GITHUB_OUTPUT"
-          # SHA-256: РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РјРѕР¶РµС‚ СЃРІРµСЂРёС‚СЊ С„Р°Р№Р» РїРѕСЃР»Рµ СЃРєР°С‡РёРІР°РЅРёСЏ.
+          # SHA-256: пользователь может сверить файл после скачивания.
           sha256sum "$DST" > "eBrake-${VERSION}.apk.sha256"
           ls -lh "$DST"
 
-      - name: РћРїСѓР±Р»РёРєРѕРІР°С‚СЊ СЂРµР»РёР·
+      - name: Опубликовать релиз
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -95,10 +95,9 @@ jobs:
             ${{ steps.apk.outputs.name }}
             ${{ steps.apk.outputs.name }}.sha256
 
-      - name: РС‚РѕРі
-        # РРјРµРЅРЅРѕ Р±Р»РѕС‡РЅС‹Р№ СЃРєР°Р»СЏСЂ: РІ РѕРґРЅРѕР№ СЃС‚СЂРѕРєРµ `run: echo "Р“РѕС‚РѕРІРѕ: ..."` РµСЃС‚СЊ
-        # В«РґРІРѕРµС‚РѕС‡РёРµ СЃ РїСЂРѕР±РµР»РѕРјВ», Рё YAML СЃС‡РёС‚Р°РµС‚ СЌС‚Рѕ РЅРѕРІС‹Рј РєР»СЋС‡РѕРј вЂ” workflow РЅРµ
-        # РїСЂРѕС…РѕРґРёС‚ РїСЂРѕРІРµСЂРєСѓ СЃС…РµРјС‹ Рё РїР°РґР°РµС‚ Р±РµР· РµРґРёРЅРѕРіРѕ С€Р°РіР°.
+      # Блочный скаляр обязателен: в одной строке `run: echo "Готово: ..."`
+      # есть «двоеточие с пробелом», YAML считает это новым ключом, и workflow
+      # отклоняется проверкой схемы — без единого выполненного шага.
+      - name: Итог
         run: |
-          echo "Р“РѕС‚РѕРІРѕ: eBrake-${{ steps.ver.outputs.tag }}.apk РІ Releases"
-
+          echo "Готово: eBrake-${{ steps.ver.outputs.tag }}.apk в Releases"
