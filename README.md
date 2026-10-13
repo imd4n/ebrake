@@ -123,24 +123,31 @@ arm64-v8a. Собран с `--enable-gpl` (из-за x264) и `--enable-lib-andr
    принимается, только если подпись совпадает. Сменили ключ — на телефоне
    придётся удалить старое приложение (с его настройками) и ставить заново.
 
-   Поэтому нужен один долгоживущий keystore:
+   Поэтому нужен один долгоживущий keystore. Ключ **не покупается и не выдаётся** —
+   он генерируется на вашей машине один раз и больше никогда не меняется:
    ```bash
    keytool -genkeypair -v -keystore ebrake-release.jks -alias ebrake \
            -keyalg RSA -keysize 4096 -validity 10000
    ```
+   На Windows `keytool` лежит в JDK Android Studio:
+   `"C:\Program Files\Android\Android Studio\jbr\bin\keytool.exe"`.
    Ключ **не коммитится** (в `.gitignore` уже есть `*.jks`, `keystore.properties`).
    Храните его в менеджере паролей и, если нужен CI, в GitHub Secrets.
 
-**Что сделано в проекте.** `app/build.gradle.kts` умеет искать ключ в двух местах:
-`keystore.properties` в корне (локально) или переменные окружения (в CI). Если
-ключа нет, release собирается под debug-ключом — так релиз никогда не падает из-за
-отсутствия секрета. Для настоящих релизов задайте `keystore.properties` или Secrets.
+**Что сделано в проекте.** Release-ключ создан и лежит вне репозитория
+(в `%USERPROFILE%\keys\ebrake-release.jks`, пароль — в менеджере паролей).
+`app/build.gradle.kts` умеет искать ключ в двух местах: `keystore.properties`
+в корне (локально) или переменные окружения (в CI). Если ключа нет, release
+собирается под debug-ключом — так релиз никогда не падает из-за отсутствия
+секрета. Для настоящих релизов задайте `keystore.properties` или Secrets.
 
-**Чего пока нет.** Собственного release-ключа я не создавал: keystore привязывает
-подпись к вам навечно, и это решение стоит принять осознанно. Как только решите —
-создайте ключ, добавьте его в Secrets (`ANDROID_KEYSTORE_BASE64`,
-`ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) и все
-последующие релизы будут подписаны им же.
+**Ловушка на Windows.** `keystore.properties` должен быть в кодировке **без BOM**,
+иначе первый ключ прочитается как `﻿storeFile` и Gradle молча соберёт APK под
+debug-подписью. Проверяется так:
+```
+<путь>\Sdk\build-tools\36.0.0\apksigner.bat verify --print-certs app\build\outputs\apk\release\app-release.apk
+```
+В `Signer #1 certificate DN` должно быть `CN=eBrake`, а не `CN=Android Debug`.
 
 `ANDROID_KEYSTORE_BASE64` — это сам файл ключа, закодированный в base64:
 ```bash
