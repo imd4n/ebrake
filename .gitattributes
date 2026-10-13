@@ -1,0 +1,8 @@
+# Сборка идёт на Linux в CI, где CRLF в gradlew ломает запуск:
+# «/usr/bin/env: ‘gradlew’: No such file or directory». Поэтому в репозитории
+# у скриптов всегда LF, а в рабочей копии на Windows autocrlf сам вернёт CRLF.
+*.sh text eol=lf
+gradlew text eol=lf
+*.kts text
+*.md text
+*.yml text

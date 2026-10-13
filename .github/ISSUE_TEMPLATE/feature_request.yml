@@ -1,0 +1,24 @@
+name: Идея или предложение
+description: Новый движок, новый формат, доработка интерфейса
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Какую задачу решает
+      description: Опишите ситуацию, в которой сейчас неудобно. Это полезнее, чем описание решения.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Как было бы удобно
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Область
+      options: [Ввод, Правка, Вывод, качество/кодеки, сборка/релиз, другое]

@@ -1,0 +1,61 @@
+name: Баг
+description: Что-то сломалось или ведёт себя не так
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Что произошло
+      description: Опишите, что вы делали и что получилось вместо ожидаемого.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Что ожидалось
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия eBrake
+      placeholder: '1.0.0 (или «сборка из main» / debug)'
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Телефон и Android
+      placeholder: 'Pixel 7, Android 14'
+
+  - type: dropdown
+    id: screen
+    attributes:
+      label: Экран
+      options: [Ввод, Правка, Вывод, док-бар / навигация, другое]
+
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Движок
+      description: Если дело в кодировании — какой был выбран на «Правке».
+      options: [HW H.264, HW H.265, SW x264, SW MPEG-4, не кодировал]
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Лог ffmpeg
+      description: |
+        На «Выводе» есть кнопка «Лог» и «Копировать» — вставьте сюда хвост.
+        Там видно коды возврата и причину ошибки.
+      render: text
+
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Проверил
+      options:
+        - label: Лог приложил(а), если дело в кодировании

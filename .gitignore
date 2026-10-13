@@ -1,0 +1,42 @@
+# ─── Сборка и IDE ────────────────────────────────────────────────────────────
+.gradle/
+build/
+*/build/
+.kotlin/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.hprof
+
+# ─── Ключи подписи (никогда не коммитить) ────────────────────────────────────
+# Ключ живёт в менеджере паролей, в репозиторий попадает только base64 из Secrets.
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+
+# ─── Собранные артефакты ─────────────────────────────────────────────────────
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+output.json
+
+# ─── ОС ─────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── ВАЖНО: prebuilt/ НЕ игнорируется ──────────────────────────────────────
+# В репозитории лежит ffmpeg-kit-next-9.0.0.aar (8.5 МБ, только arm64-v8a),
+# собранный из исходников. ffmpeg-kit-next не публикуется в Maven, поэтому без
+# этого файла `./gradlew assembleDebug` упадёт с «Could not find com.arthenica».
+# Если AAR не нужен и хочется убрать 8.5 МБ из истории — см. docs/FFMPEG_KIT_NEXT.md.
