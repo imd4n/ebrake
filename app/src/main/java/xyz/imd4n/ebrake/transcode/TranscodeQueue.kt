@@ -20,9 +20,10 @@ object TranscodeQueue {
     private val _running = MutableStateFlow(false)
     val running: StateFlow<Boolean> = _running.asStateFlow()
 
-    private val _logs = MutableStateFlow<List<String>>(
-        listOf("eBrake готов. Движок ffmpeg-kit-next подключён."),
-    )
+    // Лог начинается пустым: приветствие дописывает ViewModel из ресурсов при
+    // старте. Ставить его прямо здесь нельзя — у объекта нет Context, а строка
+    // в коде зафиксировала бы русский язык навсегда.
+    private val _logs = MutableStateFlow<List<String>>(emptyList())
     val logs: StateFlow<List<String>> = _logs.asStateFlow()
 
     /**

@@ -28,10 +28,17 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.annotation.StringRes
 
-/** Пункт левитирующего дока. */
-data class DockTab(val title: String, val icon: ImageVector)
+/**
+ * Пункт левитирующего дока.
+ *
+ * Подпись — id ресурса, а не строка: список собирается один раз на уровне
+ * модуля, и строка зафиксировала бы русский язык навсегда.
+ */
+data class DockTab(@param:StringRes val titleRes: Int, val icon: ImageVector)
 
 /**
  * Левитирующий док в духе ReFra: полупрозрачная пилюля с тенью, парящая над
@@ -102,15 +109,16 @@ fun FloatingDock(
                     ) { onSelect(index) },
                 contentAlignment = Alignment.Center,
             ) {
+                val title = stringResource(tab.titleRes)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
                         imageVector = tab.icon,
-                        contentDescription = tab.title,
+                        contentDescription = title,
                         tint = tint,
                         modifier = Modifier.size(22.dp),
                     )
                     Text(
-                        text = tab.title,
+                        text = title,
                         style = MaterialTheme.typography.labelMedium,
                         color = tint,
                         maxLines = 1,

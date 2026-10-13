@@ -2,6 +2,8 @@ package xyz.imd4n.ebrake.transcode
 
 import android.app.Application
 import android.net.Uri
+import androidx.annotation.PluralsRes
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.arthenica.ffmpegkit.FFmpegKit
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
+import xyz.imd4n.ebrake.R
 import xyz.imd4n.ebrake.transcode.TranscodeFormat.PREVIEW_SEC
 import xyz.imd4n.ebrake.transcode.TranscodeFormat.formatBytes
 import xyz.imd4n.ebrake.transcode.TranscodeFormat.formatSec
@@ -22,8 +25,14 @@ import xyz.imd4n.ebrake.transcode.TranscodeFormat.lastLogLines
 
 data class TranscodeUiState(
     val inputUri: Uri? = null,
-    val inputName: String = "Файл не выбран",
-    val mediaInfo: String = "Выбери видео на экране «Ввод»",
+    /**
+     * Пусто = файл не выбран. Раньше здесь стоял русский текст «Файл не
+     * выбран», но состояние создаётся до того, как доступен Context: строка
+     * зафиксировала бы язык навсегда. Экран сам берёт подпись из ресурсов,
+     * когда имя пустое.
+     */
+    val inputName: String = "",
+    val mediaInfo: String = "",
     val durationSec: Double = 0.0,
     /**
      * Отмеченные на «Вводе» ролики в порядке нажатий. Первый — тот, который
@@ -55,7 +64,7 @@ data class TranscodeUiState(
     /** true = выбрана пользовательская папка (нужна кнопка «Сброс»). */
     val outputTreeChosen: Boolean = false,
     /** Откуда галерея берёт ролики: выбранная папка или весь MediaStore. */
-    val inputFolderLabel: String = InputTarget.ALL_VIDEOS_LABEL,
+    val inputFolderLabel: String = "",
     /** true = выбрана папка ввода (галерея лишена разрешения MediaStore). */
     val inputFolderChosen: Boolean = false,
     /** Дерево SAF выбранной папки; null = весь MediaStore. */
@@ -69,6 +78,30 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
     private val _ui = MutableStateFlow(TranscodeUiState())
     val ui: StateFlow<TranscodeUiState> = _ui.asStateFlow()
 
+    private val context: Application get() = getApplication()
+
+    /**
+     * Форма из ресурсов с правильной формой слова. Количественное «с ошибкой»,
+     * «задание» и т. п. отличаются по числу, и склейка через `str` напечатала
+     * «с ошибкой 5».
+     */
+    private fun plural(
+        @PluralsRes id: Int,
+        quantity: Int,
+        vararg args: Any?,
+    ): String = context.resources.getQuantityString(id, quantity, *args)
+
+    /**
+     * Строка из ресурсов. Логи и подписи состояния живут вне Compose, поэтому
+     * `stringResource` там недоступен — но язык здесь всё равно правильный:
+     * берём его у текущей конфигурации, а не у системы.
+     *
+     * Аргументы nullable и правда nullable (например `e.message` у исключения):
+     * `getString` сам печатает «null», и это честнее, чем падать на ровном месте.
+     */
+    private fun str(@StringRes id: Int, vararg args: Any?): String =
+        context.getString(id, *args)
+
     /** Многоразовый SAF-URL входа (ffkitsaf://), освобождается при смене файла. */
     private var inputSafUrl: String? = null
 
@@ -78,6 +111,11 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
         // Делаем все URL многоразовыми и освобождаем вручную после каждого задания.
         // (TranscodeService ставит то же самое — сервис может стартовать первым.)
         FFmpegKitConfig.setSafUrlsReusable(true)
+
+        // Приветствие в лог: из ресурсов, иначе строка осталась бы русской.
+        // ViewModel переживает поворот экрана, а TranscodeQueue — процесс,
+        // поэтому дубликат не появляется.
+        TranscodeQueue.appendLog(str(R.string.log_engine_ready))
 
         // Зеркалим состояние очереди/лога/энкодеров в ui одним потоком,
         // чтобы экраны не знали про TranscodeQueue и EncoderCatalog.
@@ -125,7 +163,7 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                 outputTreeChosen = OutputTarget.hasTree(context),
             )
         }
-        appendLog("Папка вывода: ${OutputTarget.label(context)}")
+        appendLog(str(R.string.log_output_folder, OutputTarget.label(context)))
     }
 
     /**
@@ -143,7 +181,7 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                 inputTreeUri = InputTarget.treeUri(context),
             )
         }
-        appendLog("Папка ввода: ${InputTarget.label(context)}")
+        appendLog(str(R.string.log_input_folder, InputTarget.label(context)))
     }
 
     /**
@@ -188,8 +226,8 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
         _ui.update {
             it.copy(
                 inputUri = null,
-                inputName = "Файл не выбран",
-                mediaInfo = "Выбери видео на экране «Ввод»",
+                inputName = "",
+                mediaInfo = "",
                 durationSec = 0.0,
                 previews = emptyList(),
             )
@@ -215,12 +253,12 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
             it.copy(
                 inputUri = uri,
                 inputName = name,
-                mediaInfo = "Читаю метаданные…",
+                mediaInfo = str(R.string.input_reading),
                 durationSec = 0.0,
                 previews = emptyList(),
             )
         }
-        appendLog("Ввод: $name")
+        appendLog(str(R.string.log_input, name))
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val ctx = getApplication<Application>()
@@ -230,35 +268,60 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                 val info = session.getMediaInformation()
                 if (info == null) {
                     _ui.update {
-                        it.copy(mediaInfo = "FFprobe не смог прочитать файл.\n${lastLogLines(session.getOutput(), 5)}")
+                        it.copy(
+                            mediaInfo = str(R.string.meta_no_media_information) +
+                                "\n" + lastLogLines(context, session.getOutput(), 5),
+                        )
                     }
-                    appendLog("FFprobe: нет MediaInformation")
+                    appendLog(str(R.string.log_ffprobe_none))
                     return@launch
                 }
                 val dur = info.getDuration()?.toDoubleOrNull() ?: 0.0
                 val streams = prettyStreams(info)
+                val locale = TranscodeFormat.currentLocale(ctx)
                 _ui.update {
                     it.copy(
                         durationSec = dur,
                         mediaInfo = buildString {
-                            append("Формат: ${info.getFormat()} (${info.getLongFormat()})\n")
-                            append("Длительность: ${formatSec(dur)}, размер: ${formatBytes(info.getSize()?.toLongOrNull() ?: 0)}\n")
-                            append("Битрейт: ${info.getBitrate() ?: "?"} bps\n")
+                            append(
+                                str(
+                                    R.string.meta_format,
+                                    info.getFormat(),
+                                    info.getLongFormat(),
+                                ),
+                            )
+                            append("\n")
+                            append(
+                                str(
+                                    R.string.meta_duration,
+                                    formatSec(dur, locale),
+                                    formatBytes(ctx, info.getSize()?.toLongOrNull() ?: 0),
+                                ),
+                            )
+                            append("\n")
+                            append(str(R.string.meta_bitrate, info.getBitrate() ?: "?"))
+                            append("\n")
                             append(streams)
                         },
                     )
                 }
-                appendLog("FFprobe: ${info.getFormat()}, ${formatSec(dur)}")
+                appendLog(
+                    str(
+                        R.string.log_ffprobe_summary,
+                        info.getFormat(),
+                        formatSec(dur, locale),
+                    ),
+                )
             } catch (e: Exception) {
-                _ui.update { it.copy(mediaInfo = "Ошибка чтения: ${e.message}") }
-                appendLog("FFprobe упал: ${e.message}")
+                _ui.update { it.copy(mediaInfo = str(R.string.meta_read_error, e.message)) }
+                appendLog(str(R.string.log_ffprobe_failed, e.message))
             }
         }
     }
 
     fun setEngine(engine: TranscodeEngine) {
         _ui.update { it.copy(preset = it.preset.copy(engine = engine), previews = emptyList()) }
-        appendLog("Движок: ${engine.title}")
+        appendLog(str(R.string.log_engine_set, str(engine.titleRes)))
     }
 
     fun setCompareLevel(level: CompareLevel) {
@@ -274,7 +337,7 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
         val state = _ui.value
         val saf = inputSafUrl
         if (state.inputUri == null || saf == null) {
-            appendLog("Сравнение: сначала выбери файл на экране «Ввод».")
+            appendLog(str(R.string.log_compare_no_file))
             return
         }
         if (state.compareRunning) return
@@ -287,14 +350,22 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                     compareRunId = it.compareRunId + 1,
                 )
             }
-            EncoderCatalog.ensureDetected()
+            EncoderCatalog.ensureDetected(getApplication())
             val wanted = state.preset.engine
             val engine = EncoderCatalog.effective(wanted)
             if (engine != wanted) {
-                appendLog("Движок ${wanted.ffmpegVideoCodec} отсутствует в сборке → использую ${engine.ffmpegVideoCodec}.")
+                appendLog(
+                    str(
+                        R.string.log_engine_missing,
+                        wanted.ffmpegVideoCodec,
+                        engine.ffmpegVideoCodec,
+                    ),
+                )
             }
             val seek = ((state.durationSec - PREVIEW_SEC) / 2).coerceAtLeast(0.0).toInt()
-            appendLog("Сравнение: отрезок 10 сек со ${seek}с → 3 уровня (${engine.title})…")
+            appendLog(
+                str(R.string.log_compare_start, seek, str(engine.titleRes)),
+            )
             val results = mutableListOf<PreviewResult>()
             CompareLevel.entries.forEachIndexed { idx, level ->
                 if (!ui.value.compareRunning) return@forEachIndexed // отменили
@@ -307,27 +378,37 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                     durationSec = PREVIEW_SEC,
                 )
                 _ui.update {
-                    it.copy(compareStatus = "${level.title} (${idx + 1}/3)…")
+                    it.copy(
+                        compareStatus = "${str(level.titleRes)} (${idx + 1}/3)…",
+                    )
                 }
                 // Команду в лог не пишем: она длинная и перебивает ход событий,
                 // а по ошибке ffmpeg всё равно отдаёт свой хвост вывода.
-                appendLog("Сравнение: ${level.title} (${idx + 1}/3)…")
+                appendLog(str(R.string.log_compare_level, str(level.titleRes), idx + 1))
                 val session = FFmpegKit.execute(cmd)
                 val rc = session.getReturnCode()
                 if (ReturnCode.isSuccess(rc) && outFile.exists()) {
                     results += PreviewResult(level, outFile.length(), cmd, outFile.absolutePath)
-                    appendLog("${level.title}: готово, ${formatBytes(outFile.length())}")
+                    appendLog(
+                        str(
+                            R.string.log_level_done,
+                            str(level.titleRes),
+                            formatBytes(getApplication<Application>(), outFile.length()),
+                        ),
+                    )
                 } else {
                     appendLog(
-                        "${level.title}: ОШИБКА rc=${rc?.value}\n" +
-                            lastLogLines(session.getOutput(), 8),
+                        str(R.string.log_level_failed, str(level.titleRes), rc?.value) +
+                            "\n" + lastLogLines(context, session.getOutput(), 8),
                     )
                 }
                 _ui.update { it.copy(compareProgress01 = (idx + 1) / 3f, previews = results.toList()) }
             }
             val done = ui.value.compareRunning
             _ui.update { it.copy(compareRunning = false, compareStatus = "") }
-            appendLog(if (done) "Сравнение готово: выбери уровень кнопкой под карточкой." else "Сравнение отменено.")
+            appendLog(
+                if (done) str(R.string.log_compare_done) else str(R.string.log_compare_cancelled),
+            )
         }
     }
 
@@ -335,13 +416,13 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
         if (!_ui.value.compareRunning) return
         FFmpegKit.cancel()
         _ui.update { it.copy(compareRunning = false, compareStatus = "") }
-        appendLog("Сравнение: отмена запрошена…")
+        appendLog(str(R.string.log_compare_cancel_requested))
     }
 
     fun enqueueSelected() {
         val state = _ui.value
         val uri = state.inputUri ?: run {
-            appendLog("Очередь: нечего добавлять — выбери файл.")
+            appendLog(str(R.string.log_queue_nothing))
             return
         }
         addJob(uri, state.inputName, state.preset)
@@ -356,7 +437,7 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
         val state = _ui.value
         val rest = state.selection.drop(1)
         if (rest.isEmpty()) {
-            appendLog("Импорт: отметь хотя бы два ролика — первый идёт на сравнение.")
+            appendLog(str(R.string.log_import_too_few))
             return
         }
         var added = 0
@@ -364,8 +445,14 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
             if (addJob(picked.uri, picked.name, state.preset)) added++
         }
         appendLog(
-            "Импорт: в очередь ушло $added из ${state.selection.size - 1}. " +
-                "Сравнение — по «${state.inputName}».",
+            plural(
+                R.plurals.log_import_done,
+                added,
+                added,
+                state.selection.size - 1,
+                // Имя первого ролика: в этот момент он точно есть (rest не пуст).
+                state.inputName.ifEmpty { str(R.string.input_none_selected) },
+            ),
         )
     }
 
@@ -377,29 +464,35 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
         val pending = TranscodeQueue.queue.value
             .any { it.inputUri == uri && it.status in PENDING_STATUSES }
         if (pending) {
-            appendLog("Уже в очереди: $name — пропускаю.")
+            appendLog(str(R.string.log_already_queued, name))
             return false
         }
         val job = TranscodeJob(
             id = TranscodeQueue.nextId(),
             inputUri = uri,
             inputName = name,
-            displayName = "$name · ${preset.compareLevel.title}",
+            displayName = name,
             preset = preset,
         )
         TranscodeQueue.add(job)
-        appendLog("В очередь добавлено: ${job.displayName} [${job.preset.engine.shortName}]")
+        appendLog(
+            str(
+                R.string.log_enqueued,
+                job.displayName,
+                str(job.preset.engine.shortNameRes),
+            ),
+        )
         return true
     }
 
     fun clearDone() {
         TranscodeQueue.clearDone()
-        appendLog("История выполненных очищена.")
+        appendLog(str(R.string.log_done_cleared))
     }
 
     fun clearFinished() {
         if (_ui.value.queueRunning) {
-            appendLog("Очистка: сначала останови очередь.")
+            appendLog(str(R.string.log_clear_while_running))
             return
         }
         TranscodeQueue.clearFinished()
@@ -413,7 +506,7 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
     fun startQueue() {
         if (_ui.value.queueRunning) return
         if (!TranscodeQueue.hasQueued()) {
-            appendLog("Старт: в очереди нет заданий со статусом «В очереди».")
+            appendLog(str(R.string.log_start_empty))
             return
         }
         TranscodeService.start(getApplication())
@@ -433,12 +526,18 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
      * счётчики энкодеров/декодеров, полные -h обоих HW-энкодеров.
      */
     fun runEngineDiagnostics() {
-        appendLog("Диагностика движка…")
+        appendLog(str(R.string.log_diagnostics_start))
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val version = FFmpegKit.execute("-version")
                 val firstLine = version.getOutput()?.lineSequence()?.firstOrNull() ?: "?"
-                appendLog("ffmpeg: $firstLine (rc=${version.getReturnCode()?.value})")
+                appendLog(
+                    str(
+                        R.string.log_diagnostics_ffmpeg,
+                        firstLine,
+                        version.getReturnCode()?.value,
+                    ),
+                )
 
                 val enc = FFmpegKit.execute("-hide_banner -encoders").getOutput().orEmpty()
                 val encLines = enc.lineSequence().toList()
@@ -446,15 +545,27 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                 val names = encLines.map { it.trim().split(Regex("\\s+")).getOrNull(1).orEmpty() }
                     .filter { it.isNotEmpty() && it != "----" }.toSet()
                 EncoderCatalog.publish(names)
-                appendLog("энкодеров всего строк: ${encLines.size}, видео: ${videoEnc.size}")
-                appendLog("видео-энкодеры:\n" + videoEnc.joinToString("\n"))
+                appendLog(
+                    str(
+                        R.string.log_diagnostics_encoder_count,
+                        encLines.size,
+                        videoEnc.size,
+                    ),
+                )
+                appendLog(str(R.string.log_diagnostics_video_encoders) + "\n" + videoEnc.joinToString("\n"))
                 listOf("h264_mediacodec", "hevc_mediacodec", "libx264", "libx265", " aac ").forEach { key ->
                     appendLog("has[$key] = ${encLines.any { it.contains(key) }}")
                 }
 
                 val dec = FFmpegKit.execute("-hide_banner -decoders").getOutput().orEmpty()
                 val decLines = dec.lineSequence().toList()
-                appendLog("декодеров строк: ${decLines.size}, mediacodec: ${decLines.count { it.contains("mediacodec") }}")
+                appendLog(
+                    str(
+                        R.string.log_diagnostics_decoder_count,
+                        decLines.size,
+                        decLines.count { it.contains("mediacodec") },
+                    ),
+                )
 
                 listOf("h264_mediacodec", "hevc_mediacodec").forEach { name ->
                     val h = FFmpegKit.execute("-hide_banner -h encoder=$name").getOutput().orEmpty()
@@ -465,10 +576,13 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                         }
                         .take(25)
                         .toList()
-                    appendLog("$name:\n" + kept.joinToString("\n").ifEmpty { "(пусто)" })
+                    appendLog(
+                        "$name:\n" +
+                            kept.joinToString("\n").ifEmpty { str(R.string.log_empty) },
+                    )
                 }
             } catch (e: Exception) {
-                appendLog("диагностика упала: ${e.message}")
+                appendLog(str(R.string.log_diagnostics_failed, e.message))
             }
         }
     }
@@ -483,9 +597,15 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
     private fun prettyStreams(info: com.arthenica.ffmpegkit.MediaInformation): String =
         info.getStreams()?.joinToString("\n") { s ->
             when (s.getType()) {
-                "video" -> "видео: ${s.getCodec()} ${s.getWidth()}x${s.getHeight()} ${s.getAverageFrameRate()} fps"
-                "audio" -> "аудио: ${s.getCodec()} ${s.getSampleRate()} Hz"
-                else -> "${s.getType()}: ${s.getCodec()}"
+                "video" -> str(
+                    R.string.stream_video,
+                    s.getCodec(),
+                    s.getWidth(),
+                    s.getHeight(),
+                    s.getAverageFrameRate(),
+                )
+                "audio" -> str(R.string.stream_audio, s.getCodec(), s.getSampleRate())
+                else -> str(R.string.stream_other, s.getType(), s.getCodec())
             }
         }.orEmpty()
 

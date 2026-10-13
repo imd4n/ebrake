@@ -11,6 +11,68 @@
 Обе команды гоняет CI на каждом пуше и PR, так что локальный прогон — способ
 узнать проблему за 10 секунд вместо 3 минут в очереди GitHub Actions.
 
+## Локализация
+
+Русский — язык по умолчанию (`res/values/strings.xml`), английский — в
+`res/values-en/`. Пользователь выбирает язык приложения в настройках Android
+(13+), список — `res/xml/locales_config.xml`.
+
+**Правило: никакого пользовательского текста в коде.** Ни строковых литералов,
+ни `Text("В очередь")`, ни `"$name · ${level.title}"`. Только ресурсы:
+
+```kotlin
+Text(stringResource(R.string.action_enqueue))          // Compose
+context.getString(R.string.log_input, name)            // ViewModel, Service
+```
+
+Подписи в перечислениях — тоже `@StringRes`, а не `String`. Иначе язык
+зафиксируется в момент создания объекта.
+
+**Склеивание строк запрещено**, особенно с числами. «%d задание» посреди
+фразы нельзя ни перевести, ни согласовать. Цифры со словами — всегда
+`<plurals>`:
+
+```xml
+<plurals name="queue_count">
+    <item quantity="one">Очередь: %1$d задание</item>
+    <item quantity="few">Очередь: %1$d задания</item>
+    <item quantity="many">Очередь: %1$d заданий</item>
+</plurals>
+```
+
+В русском нужны все три формы плюс `other`; в английском хватает `one`/`other`.
+Число для выбора формы передаётся отдельно от чисел для подстановки:
+
+```kotlin
+pluralStringResource(R.plurals.queue_count, count, count)
+```
+
+**Формат чисел — по локали, а не «как в системе».** Раньше `String.format`
+без локали печатал «31.3» на CI и «31,3» локально, и тесты падали через раз.
+Сейчас локаль передаётся явно: `TranscodeFormat.number(value, locale)` и
+`TranscodeFormat.formatBytes(context, bytes)` берут локаль приложения из
+конфигурации. `Locale.getDefault()` в приложении не используется нигде.
+
+### Как добавить язык
+
+1. `cp -r app/src/main/res/values-en app/src/main/res/values-xx` (`xx` — код
+   ISO 639-1: `de`, `fr`, `uk`).
+2. Перевести значения. **Имена и плейсхолдеры не трогать**: переименованный
+   `%1$s` молча напечатает не то число, и это не поймает ни линт, ни тесты.
+3. Добавить `<locale android:name="xx"/>` в `res/xml/locales_config.xml` —
+   иначе язык не появится в настройках Android.
+4. Прогнать `./gradlew :app:lintDebug`. `MissingTranslation` и
+   `StringFormatMatches` включены по умолчанию и роняют сборку, а не warning:
+   недопереведённая строка и битый плейсхолдер должны быть видны сразу.
+
+Проверить результат:
+
+```bash
+aapt2 dump resources app/build/outputs/apk/release/app-release.apk | grep -A2 tab_input
+```
+
+Должно быть видно и `()`, и `(en)` — значит обе локали реально попали в APK.
+
 ## Стиль
 
 - Kotlin, 4 пробела, имена в стиле текущего файла.
@@ -43,14 +105,17 @@
 
 ## Локаль тестов
 
-`String.format` без явной локали берёт локаль устройства: на английском системном
-языке «31,3 МБ» превращалось в «31.3 МБ», и тесты падали только на CI. Формат в
-`TranscodeFormat` зафиксирован явно (`Locale.forLanguageTag("ru")`) — потому что
-единицы там русские. Проверить локально с чужой локалью:
+`String.format` без явной локали берёт локаль машины: на CI (en_US) «31,3 МБ»
+превращалось в «31.3 МБ», и тесты падали ровно в одном окружении из двух.
+Сейчас локаль передаётся явно, а тест проверяет оба варианта сразу:
 
-```bash
-./gradlew :app:testDebugUnitTest --rerun-tasks -Duser.language=en -Duser.country=US
+```kotlin
+assertEquals("31,3", TranscodeFormat.number(31.3, Locale.forLanguageTag("ru")))
+assertEquals("31.3", TranscodeFormat.number(31.3, Locale.US))
 ```
+
+Системная локаль на прогон тестов не влияет, но если добавляете форматирование —
+проверьте его с `--rerun-tasks -Duser.language=en -Duser.country=US`.
 
 ## Движок ffmpeg
 

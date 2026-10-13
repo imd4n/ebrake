@@ -1,9 +1,11 @@
 package xyz.imd4n.ebrake.transcode
 
+import android.content.Context
 import com.arthenica.ffmpegkit.FFmpegKit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import xyz.imd4n.ebrake.R
 
 /** Что удалось вытащить из `-encoders`. Пустое detected = детект ещё не проходил. */
 data class EncoderState(
@@ -26,7 +28,7 @@ object EncoderCatalog {
      * не любит параллельные сессии.
      */
     @Synchronized
-    fun ensureDetected() {
+    fun ensureDetected(context: Context) {
         if (_state.value.detected) return
         val names = runCatching {
             FFmpegKit.execute("-hide_banner -encoders").getOutput().orEmpty()
@@ -36,7 +38,13 @@ object EncoderCatalog {
             .filter { it.isNotEmpty() && it != "----" }
             .toSet()
         publish(names)
-        TranscodeQueue.appendLog("Детект энкодеров: всего ${names.size}.")
+        TranscodeQueue.appendLog(
+            context.resources.getQuantityString(
+                R.plurals.log_encoder_detected,
+                names.size,
+                names.size,
+            ),
+        )
     }
 
     /** Для ручного детекта из диагностики — результат не логируем повторно. */

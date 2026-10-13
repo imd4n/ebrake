@@ -1,34 +1,54 @@
 package xyz.imd4n.ebrake.transcode
 
+import android.content.Context
 import android.net.Uri
+import androidx.annotation.StringRes
 import java.util.Locale
+import xyz.imd4n.ebrake.R
 
 /**
  * Движок кодирования для одного задания.
  *
- * [title] — длинная подпись для логов и уведомлений, [shortName] + [hint] —
- * разложение для сетки чипов на «Правке», где ширина одной ячейки мала.
+ * Подписи — не строки, а id ресурсов: иначе они останутся русскими у
+ * англоязычного пользователя. Экраны берут текст через `stringResource`,
+ * логи и уведомления — через `getString`.
+ *
+ * [titleRes] — длинная подпись для логов и уведомлений, [shortNameRes] +
+ * [hintRes] — разложение для сетки чипов на «Правке», где ширина ячейки мала.
  */
 enum class TranscodeEngine(
-    val title: String,
+    @param:StringRes val titleRes: Int,
     val ffmpegVideoCodec: String,
-    val shortName: String,
-    val hint: String,
+    @param:StringRes val shortNameRes: Int,
+    @param:StringRes val hintRes: Int,
 ) {
-    HW_H264("HW H.264 (MediaCodec, быстро)", "h264_mediacodec", "HW H.264", "быстро"),
-    HW_HEVC("HW H.265 (MediaCodec, компактно)", "hevc_mediacodec", "HW H.265", "компактнее"),
-    SW_X264("SW x264 (точный CRF, медленно)", "libx264", "SW x264", "точный CRF"),
-    SW_MPEG4("SW MPEG-4 (везде работает)", "mpeg4", "SW MPEG-4", "везде работает"),
+    HW_H264(
+        R.string.engine_hw_h264_title, "h264_mediacodec",
+        R.string.engine_hw_h264_short, R.string.engine_hw_h264_hint,
+    ),
+    HW_HEVC(
+        R.string.engine_hw_hevc_title, "hevc_mediacodec",
+        R.string.engine_hw_hevc_short, R.string.engine_hw_hevc_hint,
+    ),
+    SW_X264(
+        R.string.engine_sw_x264_title, "libx264",
+        R.string.engine_sw_x264_short, R.string.engine_sw_x264_hint,
+    ),
+    SW_MPEG4(
+        R.string.engine_sw_mpeg4_title, "mpeg4",
+        R.string.engine_sw_mpeg4_short, R.string.engine_sw_mpeg4_hint,
+    ),
     ;
 
-    override fun toString(): String = title
+    /** Короткое имя для логов и файлов: язык тут ни при чём, имя кодера. */
+    override fun toString(): String = ffmpegVideoCodec
 }
 
 /** Три уровня сжатия для экрана сравнения. */
-enum class CompareLevel(val title: String) {
-    HIGH("Высокое"),
-    BALANCED("Баланс"),
-    ECO("Эко"),
+enum class CompareLevel(@param:StringRes val titleRes: Int) {
+    HIGH(R.string.level_high),
+    BALANCED(R.string.level_balanced),
+    ECO(R.string.level_eco),
 }
 
 /** Параметры кодирования, общие для превью и финальной очереди. */
@@ -73,9 +93,13 @@ data class DoneRecord(
     val inputUri: Uri,
     val inputBytes: Long,
     val outputBytes: Long,
-    /** Короткое имя движка («HW H.264») — в карточке истории длинная подпись не нужна. */
-    val engineName: String,
-    val levelTitle: String,
+    /**
+     * Движок и уровень хранятся перечислениями, а не строками: запись живёт
+     * дольше, чем может смениться язык телефона, и сохранённая подпись осталась
+     * бы на старом языке. Экран берёт текст из ресурсов сам.
+     */
+    val engine: TranscodeEngine,
+    val level: CompareLevel,
     val outputPath: String,
 ) {
     val savedBytes: Long get() = Savings.savedBytes(inputBytes, outputBytes)
@@ -112,11 +136,11 @@ data class PreviewResult(
     val outputPath: String = "",
 )
 
-enum class JobStatus(val title: String) {
-    QUEUED("В очереди"),
-    RUNNING("Кодируется"),
-    DONE("Готово"),
-    FAILED("Ошибка"),
+enum class JobStatus(@param:StringRes val titleRes: Int) {
+    QUEUED(R.string.status_queued),
+    RUNNING(R.string.status_running),
+    DONE(R.string.status_done),
+    FAILED(R.string.status_failed),
 }
 
 /**
@@ -231,34 +255,76 @@ object FfmpegCommands {
 /**
  * Форматирование размеров/времени/логов. Лежит рядом с моделями, а не во
  * ViewModel, потому что пользуются и UI, и фоновый сервис (уведомление).
+ *
+ * Локаль передаётся явно, а не берётся из `Locale.getDefault()`. Иначе
+ * получается ровно то, что уже случалось: число печатается разделителем
+ * системы («31.3»), а единица — из ресурсов («МБ»). Дальше это расходится по
+ * логам, уведомлениям и сохранённой истории, где язык один, а локаль — нет.
+ *
+ * Само форматирование чисел остаётся чистым: ресурсы нужны только за единицами
+ * измерения, поэтому их подставляет вызывающий через [formatBytes] в UI или
+ * через `getString` в сервисе. Тесты бьют по чистой части — см. [sizeParts].
  */
 object TranscodeFormat {
     /** Длина превью-отрезка для сравнения качества, сек. */
     const val PREVIEW_SEC = 10
 
-    // Формат фиксирован, а не Locale.getDefault(): единицы здесь русские
-    // («МБ», «ГБ»), поэтому и разделитель должен быть запятой. С локалью
-    // устройства на английском получалось «31.3 МБ», а тесты на CI падали.
-    private val RU = Locale.forLanguageTag("ru")
-
-    fun formatBytes(b: Long): String = when {
-        b >= 1_000_000_000 -> "%.1f ГБ".format(RU, b / 1_000_000_000.0)
-        b >= 1_000_000 -> "%.1f МБ".format(RU, b / 1_000_000.0)
-        b >= 1_000 -> "%.0f КБ".format(RU, b / 1_000.0)
-        else -> "$b Б"
+    /** Единица измерения размера. */
+    enum class SizeUnit(@param:StringRes val labelRes: Int) {
+        BYTES(R.string.unit_b),
+        KILOBYTES(R.string.unit_kb),
+        MEGABYTES(R.string.unit_mb),
+        GIGABYTES(R.string.unit_gb),
     }
 
-    fun formatSec(d: Double): String {
+    /**
+     * Разбор размера на число и единицу — без строк и ресурсов, чтобы
+     * покрывалось обычным юнит-тестом.
+     */
+    fun sizeParts(bytes: Long): Pair<Double, SizeUnit> = when {
+        bytes >= 1_000_000_000 -> bytes / 1_000_000_000.0 to SizeUnit.GIGABYTES
+        bytes >= 1_000_000 -> bytes / 1_000_000.0 to SizeUnit.MEGABYTES
+        bytes >= 1_000 -> bytes / 1_000.0 to SizeUnit.KILOBYTES
+        else -> bytes.toDouble() to SizeUnit.BYTES
+    }
+
+    /** Число в локали пользователя; цифры и разделитель — как у него в системе. */
+    fun number(value: Double, locale: Locale, decimals: Int = 1): String =
+        if (decimals == 0) {
+            String.format(locale, "%.0f", value)
+        } else {
+            String.format(locale, "%\u002e1f", value)
+        }
+
+    /** Размер с единицей: [context] — источник перевода «МБ»/«MB». */
+    fun formatBytes(context: Context, bytes: Long, locale: Locale = currentLocale(context)): String {
+        val (value, unit) = sizeParts(bytes)
+        val decimals = if (unit == SizeUnit.KILOBYTES) 0 else if (unit == SizeUnit.BYTES) 0 else 1
+        return context.getString(unit.labelRes, number(value, locale, decimals))
+    }
+
+    /** Локаль приложения: с учётом выбора языка в настройках (13+). */
+    fun currentLocale(context: Context): Locale =
+        context.resources.configuration.locales[0]
+
+    fun formatSec(d: Double, locale: Locale): String {
         val s = d.toInt()
-        return "%d:%02d".format(RU, s / 60, s % 60)
+        return String.format(locale, "%d:%02d", s / 60, s % 60)
     }
 
     /** Дельта размера со знаком: «−132,0 МБ» / «+4,1 МБ». */
-    fun formatDelta(bytes: Long): String {
+    fun formatDelta(context: Context, bytes: Long, locale: Locale = currentLocale(context)): String {
+        // Минус — U+2212, а не дефис: в строке «−132,0 МБ» он длиннее
+        // и не слипается с цифрой. Сам знак не переводится.
         val sign = if (bytes < 0) "−" else "+"
-        return sign + formatBytes(if (bytes < 0) -bytes else bytes)
+        return context.getString(
+            R.string.delta_signed,
+            sign,
+            formatBytes(context, if (bytes < 0) -bytes else bytes, locale),
+        )
     }
 
-    fun lastLogLines(output: String?, n: Int): String =
-        output?.lineSequence()?.toList()?.takeLast(n)?.joinToString("\n") ?: "(нет вывода)"
+    fun lastLogLines(context: Context, output: String?, n: Int): String =
+        output?.lineSequence()?.toList()?.takeLast(n)?.joinToString("\n")
+            ?: context.getString(R.string.log_no_output)
 }

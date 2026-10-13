@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
@@ -44,6 +45,7 @@ import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import xyz.imd4n.ebrake.R
 import xyz.imd4n.ebrake.transcode.CompareLevel
 import java.io.File
 import kotlin.math.roundToInt
@@ -190,7 +192,10 @@ fun QualityLevelSlider(
     if (levels.size < 2) {
         // Остальные уровни не собрались — слайдеру не на что опереться.
         Text(
-            "Уровень: ${selected?.title ?: "—"}",
+            stringResource(
+                R.string.level_label,
+                selected?.let { stringResource(it.titleRes) } ?: "—",
+            ),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = modifier,
@@ -214,7 +219,7 @@ fun QualityLevelSlider(
         ) {
             levels.forEachIndexed { index, level ->
                 Text(
-                    level.title,
+                    stringResource(level.titleRes),
                     style = MaterialTheme.typography.labelMedium,
                     color = if (index == draftIdx) {
                         MaterialTheme.colorScheme.primary
@@ -273,7 +278,7 @@ fun FullscreenQualityPreview(
                 IconButton(onClick = onDismiss) {
                     Icon(
                         Icons.Filled.FullscreenExit,
-                        contentDescription = "Выйти из полноэкранного режима",
+                        contentDescription = stringResource(R.string.cd_fullscreen_exit),
                         tint = Color.White,
                     )
                 }

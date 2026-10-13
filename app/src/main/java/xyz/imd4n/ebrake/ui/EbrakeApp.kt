@@ -24,15 +24,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import xyz.imd4n.ebrake.R
 import xyz.imd4n.ebrake.transcode.TranscodeViewModel
 import xyz.imd4n.ebrake.ui.screens.EditScreen
 import xyz.imd4n.ebrake.ui.screens.InputScreen
 import xyz.imd4n.ebrake.ui.screens.OutputScreen
 
 private val Tabs = listOf(
-    DockTab("Ввод", Icons.Filled.VideoLibrary),
-    DockTab("Правка", Icons.Filled.Tune),
-    DockTab("Вывод", Icons.Filled.Terminal),
+    DockTab(R.string.tab_input, Icons.Filled.VideoLibrary),
+    DockTab(R.string.tab_edit, Icons.Filled.Tune),
+    DockTab(R.string.tab_output, Icons.Filled.Terminal),
 )
 
 @Composable

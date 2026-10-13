@@ -100,7 +100,7 @@ class TranscodeService : Service() {
             TranscodeQueue.setRunning(true)
             var processed = 0
             try {
-                EncoderCatalog.ensureDetected()
+                EncoderCatalog.ensureDetected(this@TranscodeService)
                 while (!cancelRequested) {
                     val job = TranscodeQueue.next() ?: break
                     // false = очередь отменили, дальше не идём
@@ -109,13 +109,18 @@ class TranscodeService : Service() {
                 }
             } finally {
                 TranscodeQueue.setRunning(false)
-                TranscodeQueue.appendLog("Очередь: обработка завершена.")
+                TranscodeQueue.appendLog(getString(R.string.log_queue_finished))
                 val failed = TranscodeQueue.queue.value.count { it.status == JobStatus.FAILED }
                 finish(
                     when {
-                        cancelRequested -> "Остановлено, обработано $processed."
-                        failed > 0 -> "Обработано $processed, с ошибкой $failed."
-                        else -> "Обработано $processed."
+                        cancelRequested -> getString(R.string.notif_result_cancelled, processed)
+                        failed > 0 -> resources.getQuantityString(
+                            R.plurals.notif_result_failed,
+                            failed,
+                            processed,
+                            failed,
+                        )
+                        else -> getString(R.string.notif_result_done, processed)
                     },
                 )
             }
@@ -130,7 +135,11 @@ class TranscodeService : Service() {
         val engine = EncoderCatalog.effective(job.preset.engine)
         if (engine != job.preset.engine) {
             TranscodeQueue.appendLog(
-                "Задание ${job.id}: ${job.preset.engine.ffmpegVideoCodec} нет в сборке → ${engine.ffmpegVideoCodec}.",
+                getString(
+                    R.string.log_engine_missing,
+                    job.preset.engine.ffmpegVideoCodec,
+                    engine.ffmpegVideoCodec,
+                ),
             )
         }
         TranscodeQueue.update(job.id) {
@@ -146,7 +155,9 @@ class TranscodeService : Service() {
         val saf = try {
             FFmpegKitConfig.getSafParameterForRead(applicationContext, job.inputUri, true)
         } catch (e: Exception) {
-            TranscodeQueue.appendLog("Задание ${job.id}: не смог открыть вход: ${e.message}")
+            TranscodeQueue.appendLog(
+                getString(R.string.log_input_open_failed, job.id, e.message),
+            )
             TranscodeQueue.update(job.id) { it.copy(status = JobStatus.FAILED) }
             return true
         }
@@ -170,7 +181,9 @@ class TranscodeService : Service() {
         )
         // Сырую команду в лог не пишем: она в три строки и заслоняет смысл,
         // а по ошибке ffmpeg всё равно отдаёт свой хвост вывода.
-        TranscodeQueue.appendLog("Задание ${job.id}: ${job.displayName} — кодирую…")
+        TranscodeQueue.appendLog(
+            getString(R.string.log_job_starting, job.id, job.displayName),
+        )
         val done = CompletableFuture<Boolean>()
         FFmpegKit.executeAsync(
             cmd,
@@ -195,24 +208,34 @@ class TranscodeService : Service() {
                             inputUri = finished.inputUri,
                             inputBytes = inputBytes,
                             outputBytes = size,
-                            engineName = finished.preset.engine.shortName,
-                            levelTitle = finished.preset.compareLevel.title,
+                            engine = finished.preset.engine,
+                            level = finished.preset.compareLevel,
                             outputPath = out.display,
                         ),
                     )
                     TranscodeQueue.appendLog(
-                        "Задание ${job.id}: готово, ${formatBytes(size)} " +
-                            "(было ${formatBytes(inputBytes)}, " +
-                            "${formatDelta(inputBytes - size)})\n${out.display}",
+                        getString(
+                            R.string.log_job_done,
+                            job.id,
+                            formatBytes(this, size),
+                            formatBytes(this, inputBytes),
+                            formatDelta(this, inputBytes - size),
+                            out.display,
+                        ),
                     )
                 } else if (ReturnCode.isCancel(rc)) {
                     // Возвращаем в «В очереди», чтобы можно было перезапустить.
                     TranscodeQueue.update(job.id) { it.copy(status = JobStatus.QUEUED, progress01 = 0f) }
-                    TranscodeQueue.appendLog("Задание ${job.id}: отменено.")
+                    TranscodeQueue.appendLog(getString(R.string.log_job_cancelled, job.id))
                 } else {
                     TranscodeQueue.update(job.id) { it.copy(status = JobStatus.FAILED) }
                     TranscodeQueue.appendLog(
-                        "Задание ${job.id}: ОШИБКА rc=${rc?.value}\n" + lastLogLines(session.getOutput(), 8),
+                        getString(
+                            R.string.log_job_failed,
+                            job.id,
+                            rc?.value,
+                            lastLogLines(this, session.getOutput(), 8),
+                        ),
                     )
                 }
                 runCatching { FFmpegKitConfig.unregisterSafProtocolUrl(saf) }
@@ -245,7 +268,7 @@ class TranscodeService : Service() {
             // FFmpegKit.cancel() глушит ВСЕ сессии движка, включая compare —
             // поэтому UI не даёт запустить одно с другим (см. Edit/OutputScreen).
             FFmpegKit.cancel()
-            TranscodeQueue.appendLog("Очередь: отмена запрошдена…")
+            TranscodeQueue.appendLog(getString(R.string.log_queue_cancel_requested))
         } else if (!fromNotification) {
             return
         }
@@ -258,9 +281,12 @@ class TranscodeService : Service() {
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val channel = NotificationChannel(CHANNEL_ID, "Кодирование", NotificationManager.IMPORTANCE_LOW)
-            .apply {
-                description = "Прогресс фонового перекодирования"
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            getString(R.string.notif_channel_name),
+            NotificationManager.IMPORTANCE_LOW,
+        ).apply {
+                description = getString(R.string.notif_channel_description)
                 setShowBadge(false)
             }
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
@@ -297,13 +323,13 @@ class TranscodeService : Service() {
         } ?: 0
         val percent = ((current?.progress01 ?: 0f) * 100).toInt()
         val text = if (current == null) {
-            if (running) "Подготовка…" else "Ожидание заданий"
+            if (running) getString(R.string.notif_preparing) else getString(R.string.notif_idle)
         } else {
-            "Задача $position из ${queue.size} · $percent%"
+            getString(R.string.notif_task, position, queue.size, percent)
         }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_ebrake)
-            .setContentTitle(current?.displayName ?: "eBrake: кодирование")
+            .setContentTitle(current?.displayName ?: getString(R.string.notif_title))
             .setContentText(text)
             .setProgress(100, percent, current == null || current.progress01 <= 0f)
             .setOnlyAlertOnce(true)
@@ -312,7 +338,7 @@ class TranscodeService : Service() {
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(openAppIntent())
-            .apply { if (running) addAction(0, "Стоп", stopIntent()) }
+            .apply { if (running) addAction(0, getString(R.string.action_stop), stopIntent()) }
             .build()
     }
 
@@ -324,7 +350,7 @@ class TranscodeService : Service() {
                 NOTIFICATION_ID,
                 NotificationCompat.Builder(this, CHANNEL_ID)
                     .setSmallIcon(R.drawable.ic_stat_ebrake)
-                    .setContentTitle("eBrake: кодирование завершено")
+                    .setContentTitle(getString(R.string.notif_title_done))
                     .setContentText(text)
                     .setAutoCancel(true)
                     .setContentIntent(openAppIntent())

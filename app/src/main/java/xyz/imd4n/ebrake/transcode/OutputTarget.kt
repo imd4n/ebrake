@@ -7,6 +7,7 @@ import android.provider.DocumentsContract
 import androidx.core.content.edit
 import com.arthenica.ffmpegkit.FFmpegKitConfig
 import java.io.File
+import xyz.imd4n.ebrake.R
 
 /**
  * Куда складывать результат очереди.
@@ -101,7 +102,7 @@ object OutputTarget {
         if (tree != null) {
             val safTarget = runCatching { createDocument(context, tree, fileName) }.getOrNull()
             if (safTarget != null) return safTarget
-            TranscodeQueue.appendLog("Выбранная папка недоступна — пишу в папку приложения.")
+            TranscodeQueue.appendLog(context.getString(R.string.log_output_fallback))
             setTree(context, null)
         }
         return Target.Local(File(defaultDir(context), fileName))

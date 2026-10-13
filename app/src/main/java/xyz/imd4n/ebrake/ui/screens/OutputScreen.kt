@@ -38,11 +38,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import xyz.imd4n.ebrake.R
 import xyz.imd4n.ebrake.transcode.DoneRecord
 import xyz.imd4n.ebrake.transcode.JobStatus
 import xyz.imd4n.ebrake.transcode.TranscodeFormat.formatBytes
+import xyz.imd4n.ebrake.transcode.TranscodeFormat.formatDelta
 import xyz.imd4n.ebrake.transcode.TranscodeUiState
 import xyz.imd4n.ebrake.transcode.TranscodeViewModel
 import xyz.imd4n.ebrake.ui.VideoThumbnail
@@ -65,7 +69,10 @@ fun OutputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("Вывод", style = MaterialTheme.typography.headlineSmall)
+        Text(
+            stringResource(R.string.tab_output),
+            style = MaterialTheme.typography.headlineSmall,
+        )
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -75,12 +82,12 @@ fun OutputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
                 // сервиса подхватит новые задания после текущего.
                 onClick = { vm.enqueueSelected() },
                 modifier = Modifier.weight(1f),
-            ) { Text("В очередь") }
+            ) { Text(stringResource(R.string.action_enqueue)) }
             if (state.queueRunning) {
                 OutlinedButton(
                     onClick = { vm.cancelQueue() },
                     modifier = Modifier.weight(1f),
-                ) { Text("Стоп") }
+                ) { Text(stringResource(R.string.action_stop)) }
             } else {
                 // Сравнение и очередь гоняют один движок: FFmpegKit.cancel()
                 // глушит все сессии сразу, поэтому вместе их не запускаем.
@@ -88,15 +95,15 @@ fun OutputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
                     onClick = { vm.startQueue() },
                     enabled = !state.compareRunning,
                     modifier = Modifier.weight(1f),
-                ) { Text("Старт") }
+                ) { Text(stringResource(R.string.action_start)) }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { vm.runEngineDiagnostics() }, modifier = Modifier.weight(1f)) {
-                Text("Диагностика")
+                Text(stringResource(R.string.action_diagnostics))
             }
             OutlinedButton(onClick = { vm.clearFinished() }, modifier = Modifier.weight(1f)) {
-                Text("Очистить")
+                Text(stringResource(R.string.action_clear))
             }
         }
         Row(
@@ -105,21 +112,26 @@ fun OutputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = "Вывод в: ${state.outputLabel}",
+                text = stringResource(R.string.output_to, state.outputLabel),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            OutlinedButton(onClick = { folderPicker.launch(null) }) { Text("Папка") }
+            OutlinedButton(onClick = { folderPicker.launch(null) }) {
+                Text(stringResource(R.string.action_folder))
+            }
             if (state.outputTreeChosen) {
                 // Вернуть папку приложения, не заставляя искать исходную.
-                TextButton(onClick = { vm.setOutputTree(null) }) { Text("Сброс") }
+                TextButton(onClick = { vm.setOutputTree(null) }) {
+                    Text(stringResource(R.string.action_reset_short))
+                }
             }
         }
         Text(
-            "Очередь: ${state.queue.size}" + if (state.queueRunning) " · идёт кодирование…" else "",
+            pluralStringResource(R.plurals.queue_count, state.queue.size, state.queue.size) +
+                if (state.queueRunning) stringResource(R.string.queue_running_suffix) else "",
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -130,8 +142,7 @@ fun OutputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
             if (state.queue.isEmpty() && state.done.isEmpty()) {
                 item {
                     Text(
-                        text = "Очередь пуста. Отметь ролики на «Вводе» и нажми «Импорт» " +
-                            "или «Взять в очередь» на «Правке».",
+                        text = stringResource(R.string.queue_empty),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp),
@@ -151,8 +162,12 @@ fun OutputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Text(job.displayName, style = MaterialTheme.typography.titleSmall)
+                            // Уровень собирается здесь, а не хранится в displayName:
+                            // имя хранится дольше смены языка и застыло бы на старом.
                             Text(
-                                "${job.preset.engine.shortName} · ${job.status.title}",
+                                stringResource(job.preset.engine.shortNameRes) + " · " +
+                                    stringResource(job.preset.compareLevel.titleRes) + " · " +
+                                    stringResource(job.status.titleRes),
                                 style = MaterialTheme.typography.bodySmall,
                             )
                             if (job.status == JobStatus.RUNNING) {
@@ -160,7 +175,7 @@ fun OutputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
                             }
                             if (job.status == JobStatus.DONE && job.outputPath.isNotEmpty()) {
                                 Text(
-                                    "${formatBytes(job.outputSizeBytes)}\n${job.outputPath}",
+                                    "${formatBytes(context, job.outputSizeBytes)}\n${job.outputPath}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -197,6 +212,7 @@ private fun DoneQueueHeader(
     records: List<DoneRecord>,
     onClear: () -> Unit,
 ) {
+    val context = LocalContext.current
     val saved = records.sumOf { it.savedBytes }
     val inBytes = records.sumOf { it.inputBytes }
     val percent = if (inBytes > 0) (saved * 100 / inBytes).toInt() else 0
@@ -207,21 +223,37 @@ private fun DoneQueueHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text("Выполнено: ${records.size}", style = MaterialTheme.typography.titleSmall)
             Text(
-                text = "Сэкономлено ${formatBytes(saved)} из ${formatBytes(inBytes)}" +
-                    if (percent > 0) " ($percent%)" else "",
+                pluralStringResource(R.plurals.done_count, records.size, records.size),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = if (percent > 0) {
+                    stringResource(
+                        R.string.done_saved_percent,
+                        formatBytes(context, saved),
+                        formatBytes(context, inBytes),
+                        percent,
+                    )
+                } else {
+                    stringResource(
+                        R.string.done_saved,
+                        formatBytes(context, saved),
+                        formatBytes(context, inBytes),
+                    )
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
             )
         }
-        TextButton(onClick = onClear) { Text("Сбросить") }
+        TextButton(onClick = onClear) { Text(stringResource(R.string.action_reset)) }
     }
 }
 
 /** Строка выполненного: было → стало, экономия и доля от исходника. */
 @Composable
 private fun DoneRow(record: DoneRecord) {
+    val context = LocalContext.current
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.padding(12.dp)) {
             VideoThumbnail(uri = record.inputUri)
@@ -238,15 +270,21 @@ private fun DoneRow(record: DoneRecord) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "${record.engineName} · ${record.levelTitle}",
+                    text = stringResource(record.engine.shortNameRes) +
+                        " · " + stringResource(record.level.titleRes),
                     style = MaterialTheme.typography.bodySmall,
                 )
                 val savedLine = if (record.inputBytes > 0) {
-                    "${formatBytes(record.inputBytes)} → ${formatBytes(record.outputBytes)} · " +
-                        "${if (record.savedBytes > 0) "−" + formatBytes(record.savedBytes) else "без экономии"}" +
+                    "${formatBytes(context, record.inputBytes)} → " +
+                        "${formatBytes(context, record.outputBytes)} · " +
+                        if (record.savedBytes > 0) {
+                            formatDelta(context, record.savedBytes)
+                        } else {
+                            stringResource(R.string.done_no_savings)
+                        } +
                         if (record.savedPercent > 0) " (${record.savedPercent}%)" else ""
                 } else {
-                    "исходник: размер неизвестен"
+                    stringResource(R.string.done_source_unknown)
                 }
                 Text(
                     text = savedLine,
@@ -279,7 +317,13 @@ private fun LogPanel(
     Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(onClick = onToggle, modifier = Modifier.weight(1f)) {
-                Text(if (open) "Скрыть лог" else "Лог (${logs.size})")
+                Text(
+                    if (open) {
+                        stringResource(R.string.log_hide)
+                    } else {
+                        pluralStringResource(R.plurals.log_show, logs.size, logs.size)
+                    },
+                )
                 Spacer(Modifier.width(6.dp))
                 Icon(
                     imageVector = if (open) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
@@ -292,7 +336,7 @@ private fun LogPanel(
                 OutlinedButton(onClick = {
                     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     cm.setPrimaryClip(ClipData.newPlainText("ebrake-log", logs.joinToString("\n")))
-                }) { Text("Копировать") }
+                }) { Text(stringResource(R.string.action_copy)) }
             }
         }
         if (open) {

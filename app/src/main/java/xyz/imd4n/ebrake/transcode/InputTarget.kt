@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.core.content.edit
+import xyz.imd4n.ebrake.R
 
 /**
  * Папка ввода: каталог, из которого галерея на «Вводе» берёт ролики.
@@ -46,7 +47,7 @@ object InputTarget {
 
     /** Подпись для UI: имя папки или «Все видео», если выбран весь MediaStore. */
     fun label(context: Context): String {
-        val tree = treeUri(context) ?: return ALL_VIDEOS_LABEL
+        val tree = treeUri(context) ?: return context.getString(R.string.action_all_videos)
         val name = runCatching {
             val docId = DocumentsContract.getTreeDocumentId(tree)
             context.contentResolver.query(
@@ -73,6 +74,4 @@ object InputTarget {
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-
-    const val ALL_VIDEOS_LABEL = "Все видео"
 }

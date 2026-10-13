@@ -1,5 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Русский — язык по умолчанию (values/), английский добавлен в values-en/.
+  Так приложение остаётся русским для всех, кто ещё не переводил его на свой
+  язык, а новые локали добавляются копированием values-en/ → values-xx/.
+  Правила именования и что переводить — CONTRIBUTING.md, раздел «Локализация».
+-->
 <resources>
-    <!-- Имя в лаунчере и в заголовке уведомлений. Раньше было "e-brake" с
-         дефисом — в списке приложений это читалось как опечатка. -->
-    <string name="app_name">eBrake</string>
+    <string name="app_name" translatable="false">eBrake</string>
+
+    <!-- ══════════════ Док и заголовки экранов ══════════════ -->
+    <string name="tab_input">Ввод</string>
+    <string name="tab_edit">Правка</string>
+    <string name="tab_output">Вывод</string>
+
+    <!-- ══════════════ Действия ══════════════ -->
+    <string name="action_folder">Папка</string>
+    <string name="action_all_videos">Все видео</string>
+    <string name="action_reset">Сбросить</string>
+    <string name="action_reset_short">Сброс</string>
+    <string name="action_stop">Стоп</string>
+    <string name="action_start">Старт</string>
+    <string name="action_enqueue">В очередь</string>
+    <string name="action_copy">Копировать</string>
+    <string name="action_clear">Очистить</string>
+    <string name="action_diagnostics">Диагностика</string>
+    <string name="action_allow">Разрешить</string>
+    <string name="action_pick_manually">Выбрать вручную</string>
+
+    <!-- ══════════════ Ввод ══════════════ -->
+    <string name="input_source">Источник: %1$s</string>
+    <string name="input_compare">Сравнение: %1$s</string>
+    <string name="input_none_selected">Файл не выбран</string>
+    <string name="input_pick_hint">Выбери видео на экране «Ввод»</string>
+    <string name="input_reading">Читаю метаданные…</string>
+    <string name="input_selection_first">1 — «%1$s» на сравнение</string>
+    <string name="input_selected_single">Отмечено: %1$d</string>
+    <!-- Имя файла, если провайдер не отдал своё: нейтрально, без перевода. -->
+    <string name="input_fallback_name" translatable="false">video</string>
+
+    <plurals name="input_selection_count">
+        <item quantity="one">Отмечено: %1$d · в очередь: %2$d</item>
+        <item quantity="few">Отмечено: %1$d · в очередь: %2$d</item>
+        <item quantity="many">Отмечено: %1$d · в очередь: %2$d</item>
+        <item quantity="other">Отмечено: %1$d · в очередь: %2$d</item>
+    </plurals>
+
+    <plurals name="action_import">
+        <item quantity="one">Импорт: %1$d</item>
+        <item quantity="few">Импорт: %1$d</item>
+        <item quantity="many">Импорт: %1$d</item>
+        <item quantity="other">Импорт: %1$d</item>
+    </plurals>
+
+    <!-- ══════════════ Правка ══════════════ -->
+    <string name="edit_intro">Движок и сравнение трёх уровней на 10-секундном отрезке из середины файла.</string>
+    <string name="edit_engine">Движок</string>
+    <string name="edit_engine_fallback">При сравнении недоступный движок автоматически заменяется доступным.</string>
+    <string name="edit_compare">Сравнить 3 уровня</string>
+    <string name="edit_compare_title">Сравнение качества</string>
+    <string name="edit_compare_hint">Запусти «Сравнить 3 уровня» — превью появятся здесь.</string>
+    <string name="edit_compare_meta">%1$s · %2$s · превью %3$d сек</string>
+    <string name="edit_preview_placeholder">Превью появится здесь после сравнения.</string>
+    <string name="edit_take_to_queue">Взять «%1$s» в очередь</string>
+    <string name="level_label">Уровень: %1$s</string>
+    <string name="engine_not_in_build">нет в сборке</string>
+    <string name="cd_preview_fullscreen">Открыть превью на весь экран</string>
+    <string name="cd_fullscreen_exit">Выйти из полноэкранного режима</string>
+
+    <!-- ══════════════ Движки ══════════════ -->
+    <string name="engine_hw_h264_title">HW H.264 (MediaCodec, быстро)</string>
+    <string name="engine_hw_h264_hint">быстро</string>
+    <string name="engine_hw_hevc_title">HW H.265 (MediaCodec, компактно)</string>
+    <string name="engine_hw_hevc_hint">компактнее</string>
+    <string name="engine_sw_x264_title">SW x264 (точный CRF, медленно)</string>
+    <string name="engine_sw_x264_hint">точный CRF</string>
+    <string name="engine_sw_mpeg4_title">SW MPEG-4 (везде работает)</string>
+    <string name="engine_sw_mpeg4_hint">везде работает</string>
+
+    <!-- Короткие имена движков — это названия кодеров ffmpeg, не переводятся. -->
+    <string name="engine_hw_h264_short" translatable="false">HW H.264</string>
+    <string name="engine_hw_hevc_short" translatable="false">HW H.265</string>
+    <string name="engine_sw_x264_short" translatable="false">SW x264</string>
+    <string name="engine_sw_mpeg4_short" translatable="false">SW MPEG-4</string>
+
+    <!-- ══════════════ Уровни качества ══════════════ -->
+    <string name="level_high">Высокое</string>
+    <string name="level_balanced">Баланс</string>
+    <string name="level_eco">Эко</string>
+
+    <!-- ══════════════ Статусы задания ══════════════ -->
+    <string name="status_queued">В очереди</string>
+    <string name="status_running">Кодируется</string>
+    <string name="status_done">Готово</string>
+    <string name="status_failed">Ошибка</string>
+
+    <!-- ══════════════ Вывод ══════════════ -->
+    <string name="output_to">Вывод в: %1$s</string>
+    <string name="queue_running_suffix"> · идёт кодирование…</string>
+    <string name="queue_empty">Очередь пуста. Отметь ролики на «Вводе» и нажми «Импорт» или «Взять в очередь» на «Правке».</string>
+    <string name="done_saved">Сэкономлено %1$s из %2$s</string>
+    <string name="done_saved_percent">Сэкономлено %1$s из %2$s (%3$d%%)</string>
+    <string name="done_no_savings">без экономии</string>
+    <string name="done_source_unknown">исходник: размер неизвестен</string>
+    <string name="log_hide">Скрыть лог</string>
+
+    <plurals name="queue_count">
+        <item quantity="one">Очередь: %1$d задание</item>
+        <item quantity="few">Очередь: %1$d задания</item>
+        <item quantity="many">Очередь: %1$d заданий</item>
+        <item quantity="other">Очередь: %1$d задания</item>
+    </plurals>
+
+    <plurals name="done_count">
+        <item quantity="one">Выполнено: %1$d</item>
+        <item quantity="few">Выполнено: %1$d</item>
+        <item quantity="many">Выполнено: %1$d</item>
+        <item quantity="other">Выполнено: %1$d</item>
+    </plurals>
+
+    <plurals name="log_show">
+        <item quantity="one">Лог (%1$d)</item>
+        <item quantity="few">Лог (%1$d)</item>
+        <item quantity="many">Лог (%1$d)</item>
+        <item quantity="other">Лог (%1$d)</item>
+    </plurals>
+
+    <!-- ══════════════ Единицы размера ══════════════
+         %1$s — уже отформатированное число в локали пользователя. -->
+    <string name="unit_b">%1$s Б</string>
+    <string name="unit_kb">%1$s КБ</string>
+    <string name="unit_mb">%1$s МБ</string>
+    <string name="unit_gb">%1$s ГБ</string>
+    <!-- Минус — U+2212, а не дефис: в строке «−132,0 МБ» он длиннее и не слипается. -->
+    <string name="delta_signed">%1$s%2$s</string>
+
+    <!-- ══════════════ Метаданные файла ══════════════ -->
+    <string name="meta_format">Формат: %1$s (%2$s)</string>
+    <string name="meta_duration">Длительность: %1$s, размер: %2$s</string>
+    <string name="meta_bitrate">Битрейт: %1$s bps</string>
+    <string name="meta_read_error">Ошибка чтения: %1$s</string>
+    <string name="meta_no_media_information">FFprobe не смог прочитать файл.</string>
+    <string name="stream_video">видео: %1$s %2$dx%3$d %4$s fps</string>
+    <string name="stream_audio">аудио: %1$s %2$d Hz</string>
+    <string name="stream_other">%1$s: %2$s</string>
+
+    <!-- ══════════════ Даты в галерее ══════════════ -->
+    <string name="date_today">Сегодня</string>
+    <string name="date_yesterday">Вчера</string>
+
+    <!-- ══════════════ Галерея ══════════════ -->
+    <string name="gallery_need_access_title">Нужен доступ к видео</string>
+    <string name="gallery_need_access_text">Галерея показывает ролики из системного хранилища.</string>
+    <string name="gallery_empty_title">Видео не найдено</string>
+    <string name="gallery_empty_folder">В выбранной папке нет роликов.</string>
+    <string name="gallery_empty_all">В галерее телефона нет доступных роликов.</string>
+
+    <!-- ══════════════ Уведомления ══════════════ -->
+    <string name="notif_channel_name">Кодирование</string>
+    <string name="notif_channel_description">Прогресс фонового перекодирования</string>
+    <string name="notif_title" translatable="false">eBrake: кодирование</string>
+    <string name="notif_title_done" translatable="false">eBrake: кодирование завершено</string>
+    <string name="notif_preparing">Подготовка…</string>
+    <string name="notif_idle">Ожидание заданий</string>
+    <string name="notif_task">Задача %1$d из %2$d · %3$d%%</string>
+    <string name="notif_result_done">Обработано %1$d.</string>
+    <string name="notif_result_cancelled">Остановлено, обработано %1$d.</string>
+
+    <plurals name="notif_result_failed">
+        <item quantity="one">Обработано %1$d, с ошибкой %2$d.</item>
+        <item quantity="few">Обработано %1$d, с ошибкой %2$d.</item>
+        <item quantity="many">Обработано %1$d, с ошибкой %2$d.</item>
+        <item quantity="other">Обработано %1$d, с ошибкой %2$d.</item>
+    </plurals>
+
+    <!-- ══════════════ Журнал (панель «Лог») ══════════════ -->
+    <string name="log_input_folder">Папка ввода: %1$s</string>
+    <string name="log_output_folder">Папка вывода: %1$s</string>
+    <string name="log_input">Ввод: %1$s</string>
+    <string name="log_ffprobe_none">FFprobe: нет MediaInformation</string>
+    <string name="log_ffprobe_failed">FFprobe упал: %1$s</string>
+    <string name="log_ffprobe_summary">FFprobe: %1$s, %2$s</string>
+    <string name="log_engine_set">Движок: %1$s</string>
+    <string name="log_compare_no_file">Сравнение: сначала выбери файл на экране «Ввод».</string>
+    <string name="log_compare_start">Сравнение: отрезок 10 сек со %1$dс → 3 уровня (%2$s)…</string>
+    <string name="log_compare_level">Сравнение: %1$s (%2$d/3)…</string>
+    <string name="log_compare_done">Сравнение готово: выбери уровень кнопкой под карточкой.</string>
+    <string name="log_compare_cancelled">Сравнение отменено.</string>
+    <string name="log_compare_cancel_requested">Сравнение: отмена запрошена…</string>
+    <string name="log_queue_nothing">Очередь: нечего добавлять — выбери файл.</string>
+    <string name="log_queue_cancel_requested">Очередь: отмена запрошена…</string>
+    <string name="log_queue_finished">Очередь: обработка завершена.</string>
+    <string name="log_job_starting">Задание %1$d: %2$s — кодирую…</string>
+    <string name="log_input_open_failed">Задание %1$d: не смог открыть вход: %2$s</string>
+    <string name="log_import_too_few">Импорт: отметь хотя бы два ролика — первый идёт на сравнение.</string>
+    <plurals name="log_import_done">
+        <item quantity="one">Импорт: в очередь ушло %1$d из %2$d. Сравнение — по «%3$s».</item>
+        <item quantity="few">Импорт: в очередь ушло %1$d из %2$d. Сравнение — по «%3$s».</item>
+        <item quantity="many">Импорт: в очередь ушло %1$d из %2$d. Сравнение — по «%3$s».</item>
+        <item quantity="other">Импорт: в очередь ушло %1$d из %2$d. Сравнение — по «%3$s».</item>
+    </plurals>
+    <string name="log_already_queued">Уже в очереди: %1$s — пропускаю.</string>
+    <string name="log_enqueued">В очередь добавлено: %1$s [%2$s]</string>
+    <string name="log_done_cleared">История выполненных очищена.</string>
+    <string name="log_clear_while_running">Очистка: сначала останови очередь.</string>
+    <string name="log_start_empty">Старт: в очереди нет заданий со статусом «В очереди».</string>
+    <string name="log_engine_missing">Движок %1$s отсутствует в сборке → использую %2$s.</string>
+    <string name="log_level_done">%1$s: готово, %2$s</string>
+    <string name="log_level_failed">%1$s: ОШИБКА rc=%2$s</string>
+    <string name="log_job_done">Задание %1$d: готово, %2$s (было %3$s, %4$s)\n%5$s</string>
+    <string name="log_job_cancelled">Задание %1$d: отменено.</string>
+    <string name="log_job_failed">Задание %1$d: ОШИБКА rc=%2$d\n%3$s</string>
+    <plurals name="log_encoder_detected">
+        <item quantity="one">Детект энкодеров: всего %1$d.</item>
+        <item quantity="few">Детект энкодеров: всего %1$d.</item>
+        <item quantity="many">Детект энкодеров: всего %1$d.</item>
+        <item quantity="other">Детект энкодеров: всего %1$d.</item>
+    </plurals>
+    <string name="log_diagnostics_start">Диагностика движка…</string>
+    <string name="log_diagnostics_failed">диагностика упала: %1$s</string>
+    <string name="log_diagnostics_ffmpeg">ffmpeg: %1$s (rc=%2$s)</string>
+    <string name="log_diagnostics_encoder_count">энкодеров всего строк: %1$d, видео: %2$d</string>
+    <string name="log_diagnostics_video_encoders">видео-энкодеры:</string>
+    <string name="log_diagnostics_decoder_count">декодеров строк: %1$d, mediacodec: %2$d</string>
+    <string name="log_empty">(пусто)</string>
+<string name="log_no_output">(нет вывода)</string>
+<string name="log_output_fallback">Выбранная папка недоступна — пишу в папку приложения.</string>
+<string name="log_engine_ready">eBrake готов. Движок ffmpeg-kit-next подключён.</string>
 </resources>

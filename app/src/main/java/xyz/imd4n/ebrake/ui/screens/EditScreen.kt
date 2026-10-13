@@ -37,11 +37,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import xyz.imd4n.ebrake.R
 import xyz.imd4n.ebrake.transcode.CompareLevel
 import xyz.imd4n.ebrake.transcode.TranscodeEngine
 import xyz.imd4n.ebrake.transcode.TranscodeFormat
+import xyz.imd4n.ebrake.transcode.TranscodeFormat.formatBytes
 import xyz.imd4n.ebrake.transcode.TranscodeUiState
 import xyz.imd4n.ebrake.transcode.TranscodeViewModel
 import xyz.imd4n.ebrake.ui.FullscreenQualityPreview
@@ -74,10 +77,14 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
     }
 
     val subtitle = if (selectedPreview == null) {
-        "Запусти «Сравнить 3 уровня» — превью появятся здесь."
+        stringResource(R.string.edit_compare_hint)
     } else {
-        "${selected!!.title} · ${TranscodeFormat.formatBytes(selectedPreview.fileSizeBytes)} · " +
-            "превью ${TranscodeFormat.PREVIEW_SEC} сек"
+        stringResource(
+            R.string.edit_compare_meta,
+            stringResource(selected!!.titleRes),
+            formatBytes(context, selectedPreview.fileSizeBytes),
+            TranscodeFormat.PREVIEW_SEC,
+        )
     }
 
     LazyColumn(
@@ -85,15 +92,18 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text("Редактирование", style = MaterialTheme.typography.headlineSmall)
             Text(
-                "Движок и сравнение трёх уровней на 10-секундном отрезке из середины файла.",
+                stringResource(R.string.tab_edit),
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            Text(
+                stringResource(R.string.edit_intro),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         item {
-            Text("Движок", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.edit_engine), style = MaterialTheme.typography.titleSmall)
             // Сетка 2×N: длинные подписи в один столбец занимали пол-экрана
             // и сравнение уезжало за пределы первого взгляда.
             EngineGrid(
@@ -106,7 +116,7 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
             )
             if (state.encodersDetected) {
                 Text(
-                    "При сравнении недоступный движок автоматически заменяется доступным.",
+                    stringResource(R.string.edit_engine_fallback),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -120,10 +130,12 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
                     onClick = { vm.runCompare() },
                     enabled = !state.compareRunning && !state.queueRunning,
                 ) {
-                    Text("Сравнить 3 уровня")
+                    Text(stringResource(R.string.edit_compare))
                 }
                 if (state.compareRunning) {
-                    OutlinedButton(onClick = { vm.cancelCompare() }) { Text("Стоп") }
+                    OutlinedButton(onClick = { vm.cancelCompare() }) {
+                        Text(stringResource(R.string.action_stop))
+                    }
                 }
             }
             if (state.compareRunning) {
@@ -134,7 +146,10 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
         item {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Сравнение качества", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.edit_compare_title),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
                     Text(
                         subtitle,
                         style = MaterialTheme.typography.bodySmall,
@@ -162,7 +177,7 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
                             }
                         } else {
                             Text(
-                                "Превью появится здесь после сравнения.",
+                                stringResource(R.string.edit_preview_placeholder),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.align(Alignment.Center),
@@ -178,7 +193,7 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
                         ) {
                             Icon(
                                 Icons.Filled.Fullscreen,
-                                contentDescription = "Открыть превью на весь экран",
+                                contentDescription = stringResource(R.string.cd_preview_fullscreen),
                                 tint = Color.White,
                             )
                         }
@@ -197,7 +212,12 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
                         enabled = selected != null,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Взять «${selected?.title ?: "—"}» в очередь")
+                        Text(
+                            stringResource(
+                                R.string.edit_take_to_queue,
+                                selected?.let { stringResource(it.titleRes) } ?: "—",
+                            ),
+                        )
                     }
                 }
             }
@@ -273,14 +293,16 @@ private fun EngineCell(
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(
-            text = engine.shortName,
+            text = stringResource(engine.shortNameRes),
             style = MaterialTheme.typography.titleSmall,
             color = if (selected) scheme.primary else scheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            text = if (available) engine.hint else "нет в сборке",
+            text = stringResource(
+                if (available) engine.hintRes else R.string.engine_not_in_build,
+            ),
             style = MaterialTheme.typography.labelSmall,
             color = if (available) scheme.onSurfaceVariant else scheme.error,
             maxLines = 1,

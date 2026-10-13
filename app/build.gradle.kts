@@ -100,6 +100,11 @@ android {
         // статический анализ всё равно доступен вручную: ./gradlew :app:lint
         checkReleaseBuilds = false
         abortOnError = false
+        // MissingTranslation и StringFormatMatches включены по умолчанию и
+        // являются ошибками: недопереведённая строка и битый плейсхолдер (%3$-s)
+        // роняют lint, а не молча печатают мусор. В AGP 9 DSL для warnings/errors
+        // удалён, поэтому список проверок не трогаем — он и так нужный.
+        checkDependencies = true
     }
 }
 

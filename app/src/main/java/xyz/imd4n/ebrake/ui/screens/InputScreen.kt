@@ -30,9 +30,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import xyz.imd4n.ebrake.R
 import xyz.imd4n.ebrake.transcode.TranscodeUiState
 import xyz.imd4n.ebrake.transcode.TranscodeViewModel
 import xyz.imd4n.ebrake.ui.gallery.VideoGallery
@@ -100,15 +103,17 @@ fun InputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "Ввод",
+                text = stringResource(R.string.tab_input),
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.weight(1f),
             )
-            OutlinedButton(onClick = { folderPicker.launch(null) }) { Text("Папка") }
+            OutlinedButton(onClick = { folderPicker.launch(null) }) {
+                Text(stringResource(R.string.action_folder))
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "Источник: ${state.inputFolderLabel}",
+                text = stringResource(R.string.input_source, state.inputFolderLabel),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -117,7 +122,9 @@ fun InputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
             )
             if (state.inputFolderChosen) {
                 // Вернуться ко всем роликам, не заставляя искать папку заново.
-                TextButton(onClick = { vm.setInputFolder(null) }) { Text("Все видео") }
+                TextButton(onClick = { vm.setInputFolder(null) }) {
+                    Text(stringResource(R.string.action_all_videos))
+                }
             }
         }
         Card(modifier = Modifier.weight(1f)) {
@@ -149,7 +156,7 @@ fun InputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
                     .verticalScroll(rememberScrollState()),
             ) {
                 Text(
-                    text = "Сравнение: ${state.inputName}",
+                    text = stringResource(R.string.input_compare, state.inputName),
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -185,28 +192,46 @@ private fun SelectionBar(
     ) {
         Column(Modifier.weight(1f)) {
             Text(
-                text = "Отмечено: ${state.selection.size}" +
-                    if (rest > 0) " · в очередь: $rest" else "",
+                // Один отмеченный — без «в очередь», там ноль. Берём не quantity
+                // `one` из плюрала (он сработает и для 21, 31…), а честное
+                // условие: часть «в очередь» видна, только когда она не ноль.
+                text = if (rest > 0) {
+                    pluralStringResource(
+                        R.plurals.input_selection_count,
+                        state.selection.size,
+                        state.selection.size,
+                        rest,
+                    )
+                } else {
+                    stringResource(R.string.input_selected_single, state.selection.size)
+                },
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "1 — «${state.inputName}» на сравнение",
+                text = stringResource(
+                    R.string.input_selection_first,
+                    state.inputName.ifEmpty {
+                        stringResource(R.string.input_none_selected)
+                    },
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Button(onClick = onImport, enabled = rest > 0) { Text("Импорт: $rest") }
-        TextButton(onClick = onClear) { Text("Сбросить") }
+        Button(onClick = onImport, enabled = rest > 0) {
+            Text(pluralStringResource(R.plurals.action_import, rest, rest))
+        }
+        TextButton(onClick = onClear) { Text(stringResource(R.string.action_reset)) }
     }
 }
 
 /** Имя файла из SAF-пикера; без провайдера — просто video. */
 private fun displayName(context: android.content.Context, uri: Uri): String {
-    var name = "video"
+    var name = context.getString(R.string.input_fallback_name)
     context.contentResolver.query(uri, null, null, null, null)?.use { c ->
         val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
         if (c.moveToFirst() && idx >= 0) name = c.getString(idx)

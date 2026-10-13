@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Языки, которые предлагает Android в настройках приложения (13+).
+  Список обязан совпадать с папками res/values-xx/, иначе в пикере будет
+  язык, для которого нет перевода. Добавляете язык — добавляете строку сюда.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="ru" />
+    <locale android:name="en" />
+</locale-config>

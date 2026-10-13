@@ -44,12 +44,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import xyz.imd4n.ebrake.R
+import xyz.imd4n.ebrake.transcode.TranscodeFormat
 
 /**
  * Галерея роликов в духе ReFra: сетка обложек, разбитая по датам
@@ -104,38 +107,42 @@ fun VideoGallery(
         }
 
         !hasPermission && treeUri == null -> GalleryMessage(
-            title = "Нужен доступ к видео",
-            text = "Галерея показывает ролики из системного хранилища.",
+            title = stringResource(R.string.gallery_need_access_title),
+            text = stringResource(R.string.gallery_need_access_text),
             actions = listOf(
-                "Разрешить" to onRequestPermission,
-                "Выбрать вручную" to onPickManually,
+                stringResource(R.string.action_allow) to onRequestPermission,
+                stringResource(R.string.action_pick_manually) to onPickManually,
             ),
             modifier = modifier,
         )
 
         loaded.isEmpty() -> GalleryMessage(
-            title = "Видео не найдено",
+            title = stringResource(R.string.gallery_empty_title),
             text = if (treeUri != null) {
-                "В выбранной папке нет роликов."
+                stringResource(R.string.gallery_empty_folder)
             } else {
-                "В галерее телефона нет доступных роликов."
+                stringResource(R.string.gallery_empty_all)
             },
             actions = buildList {
-                add("Выбрать вручную" to onPickManually)
-                if (onShowAll != null) add("Все видео" to onShowAll)
+                add(stringResource(R.string.action_pick_manually) to onPickManually)
+                if (onShowAll != null) add(stringResource(R.string.action_all_videos) to onShowAll)
             },
             modifier = modifier,
         )
 
-        else -> LazyVerticalGrid(
-            // Квадраты одинаковой высоты → лесенка не нужна, обычная сетка.
-            columns = GridCells.Fixed(3),
-            modifier = modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            dateSections(loaded).forEach { (label, section) ->
+        else -> {
+            // Секции считаем до сетки: её content-лямбда не @Composable, и
+            // stringResource внутри неё не вызвать.
+            val sections = dateSections(loaded)
+            LazyVerticalGrid(
+                // Квадраты одинаковой высоты → лесенка не нужна, обычная сетка.
+                columns = GridCells.Fixed(3),
+                modifier = modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+            sections.forEach { (label, section) ->
                 item(key = "section_$label", span = { GridItemSpan(maxLineSpan) }) {
                     Text(
                         text = label,
@@ -151,6 +158,7 @@ fun VideoGallery(
                     )
                 }
             }
+            }
         }
     }
 }
@@ -163,6 +171,7 @@ private fun GalleryTile(
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current
+    val locale = TranscodeFormat.currentLocale(context)
     val selected = order != null
     Column(
         modifier = Modifier
@@ -241,7 +250,7 @@ private fun GalleryTile(
                 }
                 if (item.durationMs > 0) {
                     Text(
-                        text = formatDuration(item.durationMs),
+                        text = formatDuration(item.durationMs, locale),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White,
                         modifier = Modifier
@@ -289,6 +298,7 @@ private fun GalleryMessage(
 }
 
 /** Ролики, сгруппированные по дням: сегодня / вчера / дата. */
+@Composable
 private fun dateSections(items: List<VideoItem>): List<Pair<String, List<VideoItem>>> {
     val calendar = Calendar.getInstance()
     calendar.set(Calendar.HOUR_OF_DAY, 0)
@@ -297,16 +307,21 @@ private fun dateSections(items: List<VideoItem>): List<Pair<String, List<VideoIt
     calendar.set(Calendar.MILLISECOND, 0)
     val midnightToday = calendar.timeInMillis / 1000
     val midnightYesterday = midnightToday - 86_400L
-    val dayFormat = SimpleDateFormat("d MMMM", Locale.getDefault())
-    val dateFormat = SimpleDateFormat("d MMMM yyyy", Locale.getDefault())
+    // Локаль приложения, а не устройства: на 13+ язык выбирается отдельно в
+    // настройках, и иначе заголовки дат остались бы на системном языке.
+    val locale = TranscodeFormat.currentLocale(LocalContext.current)
+    val dayFormat = SimpleDateFormat("d MMMM", locale)
+    val dateFormat = SimpleDateFormat("d MMMM yyyy", locale)
     val thisYear = Calendar.getInstance().get(Calendar.YEAR)
+    val today = stringResource(R.string.date_today)
+    val yesterday = stringResource(R.string.date_yesterday)
 
     return items
         .groupBy { video ->
             val added = video.dateAddedSec
             when {
-                added >= midnightToday -> "Сегодня"
-                added >= midnightYesterday -> "Вчера"
+                added >= midnightToday -> today
+                added >= midnightYesterday -> yesterday
                 else -> {
                     val date = Date(added * 1000)
                     val year = Calendar.getInstance().apply { time = date }.get(Calendar.YEAR)
@@ -319,15 +334,23 @@ private fun dateSections(items: List<VideoItem>): List<Pair<String, List<VideoIt
         .sortedByDescending { (_, videos) -> videos.maxOf { it.dateAddedSec } }
 }
 
-private fun formatDuration(ms: Long): String {
+/**
+ * Таймкод ролика: `м:сс` или `ч:мм:сс`.
+ *
+ * Локаль передаётся, а не берётся из системы: %d на некоторых локалях
+ * (например арабской) подставляет восточно-арабские цифры, и таймкод рядом
+ * с латиницей выглядит чужеродно. Язык приложения указывает и на разделитель.
+ */
+private fun formatDuration(ms: Long, locale: Locale): String {
     val totalSec = ms / 1000
     val h = totalSec / 3600
     val m = (totalSec % 3600) / 60
     val s = totalSec % 60
-    // Локаль фиксируем: %d на некоторых локалях (например арабской) подставляет
-    // восточно-арабские цифры, и таймкод в галерее выглядит чужеродно.
-    val loc = Locale.forLanguageTag("ru")
-    return if (h > 0) "%d:%02d:%02d".format(loc, h, m, s) else "%d:%02d".format(loc, m, s)
+    return if (h > 0) {
+        String.format(locale, "%d:%02d:%02d", h, m, s)
+    } else {
+        String.format(locale, "%d:%02d", m, s)
+    }
 }
 
 /** Границы декодируемой обложки, px: снизу — чтобы не декодировать 20px, сверху — кэш. */

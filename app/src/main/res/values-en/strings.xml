@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  English translation. To add another language: copy this folder to values-xx/
+  (xx = ISO 639-1 code, e.g. values-de) and translate the values. Keep every
+  name and every placeholder identical — a missing name fails the build, and a
+  renamed %1$s silently prints the wrong number.
+-->
+<resources>
+    <string name="tab_input">Input</string>
+    <string name="tab_edit">Edit</string>
+    <string name="tab_output">Output</string>
+
+    <string name="action_folder">Folder</string>
+    <string name="action_all_videos">All videos</string>
+    <string name="action_reset">Clear</string>
+    <string name="action_reset_short">Reset</string>
+    <string name="action_stop">Stop</string>
+    <string name="action_start">Start</string>
+    <string name="action_enqueue">Add to queue</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_diagnostics">Diagnostics</string>
+    <string name="action_allow">Allow</string>
+    <string name="action_pick_manually">Pick manually</string>
+
+    <string name="input_source">Source: %1$s</string>
+    <string name="input_compare">Comparing: %1$s</string>
+    <string name="input_none_selected">No file selected</string>
+    <string name="input_pick_hint">Pick a video on the Input screen</string>
+    <string name="input_reading">Reading metadata…</string>
+    <string name="input_selection_first">1 — “%1$s” for comparison</string>
+    <string name="input_selected_single">Selected: %1$d</string>
+
+    <plurals name="input_selection_count">
+        <item quantity="one">Selected: %1$d · to queue: %2$d</item>
+        <item quantity="other">Selected: %1$d · to queue: %2$d</item>
+    </plurals>
+
+    <plurals name="action_import">
+        <item quantity="one">Import: %1$d</item>
+        <item quantity="other">Import: %1$d</item>
+    </plurals>
+
+    <string name="edit_intro">Engine and a three-level comparison on a 10-second clip from the middle of the file.</string>
+    <string name="edit_engine">Engine</string>
+    <string name="edit_engine_fallback">An unavailable engine is replaced automatically during comparison.</string>
+    <string name="edit_compare">Compare 3 levels</string>
+    <string name="edit_compare_title">Quality comparison</string>
+    <string name="edit_compare_hint">Run “Compare 3 levels” — previews will appear here.</string>
+    <string name="edit_compare_meta">%1$s · %2$s · %3$d-second preview</string>
+    <string name="edit_preview_placeholder">The preview will appear here after the comparison.</string>
+    <string name="edit_take_to_queue">Add “%1$s” to queue</string>
+    <string name="level_label">Level: %1$s</string>
+    <string name="engine_not_in_build">not in build</string>
+    <string name="cd_preview_fullscreen">Open preview fullscreen</string>
+    <string name="cd_fullscreen_exit">Exit fullscreen</string>
+
+    <string name="engine_hw_h264_title">HW H.264 (MediaCodec, fast)</string>
+    <string name="engine_hw_h264_hint">fast</string>
+    <string name="engine_hw_hevc_title">HW H.265 (MediaCodec, compact)</string>
+    <string name="engine_hw_hevc_hint">smaller</string>
+    <string name="engine_sw_x264_title">SW x264 (accurate CRF, slow)</string>
+    <string name="engine_sw_x264_hint">accurate CRF</string>
+    <string name="engine_sw_mpeg4_title">SW MPEG-4 (works everywhere)</string>
+    <string name="engine_sw_mpeg4_hint">works everywhere</string>
+
+    <string name="level_high">High</string>
+    <string name="level_balanced">Balanced</string>
+    <string name="level_eco">Eco</string>
+
+    <string name="status_queued">Queued</string>
+    <string name="status_running">Encoding</string>
+    <string name="status_done">Done</string>
+    <string name="status_failed">Failed</string>
+
+    <string name="output_to">Output to: %1$s</string>
+    <string name="queue_running_suffix"> · encoding…</string>
+    <string name="queue_empty">Queue is empty. Mark clips on the Input screen and tap “Import”, or “Add to queue” on the Edit screen.</string>
+    <string name="done_saved">Saved %1$s out of %2$s</string>
+    <string name="done_saved_percent">Saved %1$s out of %2$s (%3$d%%)</string>
+    <string name="done_no_savings">no savings</string>
+    <string name="done_source_unknown">source size unknown</string>
+    <string name="log_hide">Hide log</string>
+
+    <plurals name="queue_count">
+        <item quantity="one">Queue: %1$d item</item>
+        <item quantity="other">Queue: %1$d items</item>
+    </plurals>
+
+    <plurals name="done_count">
+        <item quantity="one">Done: %1$d</item>
+        <item quantity="other">Done: %1$d</item>
+    </plurals>
+
+    <plurals name="log_show">
+        <item quantity="one">Log (%1$d)</item>
+        <item quantity="other">Log (%1$d)</item>
+    </plurals>
+
+    <string name="unit_b">%1$s B</string>
+    <string name="unit_kb">%1$s KB</string>
+    <string name="unit_mb">%1$s MB</string>
+    <string name="unit_gb">%1$s GB</string>
+    <string name="delta_signed">%1$s%2$s</string>
+
+    <string name="meta_format">Format: %1$s (%2$s)</string>
+    <string name="meta_duration">Duration: %1$s, size: %2$s</string>
+    <string name="meta_bitrate">Bitrate: %1$s bps</string>
+    <string name="meta_read_error">Read error: %1$s</string>
+    <string name="meta_no_media_information">FFprobe could not read the file.</string>
+    <string name="stream_video">video: %1$s %2$dx%3$d %4$s fps</string>
+    <string name="stream_audio">audio: %1$s %2$d Hz</string>
+    <string name="stream_other">%1$s: %2$s</string>
+
+    <string name="date_today">Today</string>
+    <string name="date_yesterday">Yesterday</string>
+
+    <string name="gallery_need_access_title">Video access needed</string>
+    <string name="gallery_need_access_text">The gallery lists clips from system storage.</string>
+    <string name="gallery_empty_title">No videos found</string>
+    <string name="gallery_empty_folder">The selected folder has no clips.</string>
+    <string name="gallery_empty_all">No clips available in the device gallery.</string>
+
+    <string name="notif_channel_name">Encoding</string>
+    <string name="notif_channel_description">Background transcoding progress</string>
+    <!-- notif_title / notif_title_done помечены translatable="false" в
+         values/strings.xml и потому намеренно отсутствуют здесь: «eBrake»
+         это имя, а не переводимое слово. -->
+    <string name="notif_preparing">Preparing…</string>
+    <string name="notif_idle">Waiting for jobs</string>
+    <string name="notif_task">Job %1$d of %2$d · %3$d%%</string>
+    <string name="notif_result_done">Processed %1$d.</string>
+    <string name="notif_result_cancelled">Stopped, processed %1$d.</string>
+
+    <plurals name="notif_result_failed">
+        <item quantity="one">Processed %1$d, %2$d failed.</item>
+        <item quantity="other">Processed %1$d, %2$d failed.</item>
+    </plurals>
+
+    <string name="log_input_folder">Input folder: %1$s</string>
+    <string name="log_output_folder">Output folder: %1$s</string>
+    <string name="log_input">Input: %1$s</string>
+    <string name="log_ffprobe_none">FFprobe: no MediaInformation</string>
+    <string name="log_ffprobe_failed">FFprobe failed: %1$s</string>
+    <string name="log_ffprobe_summary">FFprobe: %1$s, %2$s</string>
+    <string name="log_engine_set">Engine: %1$s</string>
+    <string name="log_compare_no_file">Comparison: pick a file on the Input screen first.</string>
+    <string name="log_compare_start">Comparison: 10 sec from %1$ds → 3 levels (%2$s)…</string>
+    <string name="log_compare_level">Comparison: %1$s (%2$d/3)…</string>
+    <string name="log_compare_done">Comparison done: pick a level with the control below the card.</string>
+    <string name="log_compare_cancelled">Comparison cancelled.</string>
+    <string name="log_compare_cancel_requested">Comparison: cancelling…</string>
+    <string name="log_queue_nothing">Queue: nothing to add — pick a file.</string>
+    <string name="log_queue_cancel_requested">Queue: cancelling…</string>
+    <string name="log_queue_finished">Queue: finished.</string>
+    <string name="log_job_starting">Job %1$d: %2$s — encoding…</string>
+    <string name="log_input_open_failed">Job %1$d: could not open input: %2$s</string>
+    <string name="log_import_too_few">Import: mark at least two clips — the first one goes to comparison.</string>
+    <plurals name="log_import_done">
+        <item quantity="one">Import: %1$d of %2$d added to queue. Comparing “%3$s”.</item>
+        <item quantity="other">Import: %1$d of %2$d added to queue. Comparing “%3$s”.</item>
+    </plurals>
+    <string name="log_already_queued">Already queued: %1$s — skipped.</string>
+    <string name="log_enqueued">Added to queue: %1$s [%2$s]</string>
+    <string name="log_done_cleared">History cleared.</string>
+    <string name="log_clear_while_running">Clear: stop the queue first.</string>
+    <string name="log_start_empty">Start: no jobs with status “Queued” in the queue.</string>
+    <string name="log_engine_missing">Engine %1$s is not in this build → using %2$s.</string>
+    <string name="log_level_done">%1$s: done, %2$s</string>
+    <string name="log_level_failed">%1$s: FAILED rc=%2$s</string>
+    <string name="log_job_done">Job %1$d: done, %2$s (was %3$s, %4$s)\n%5$s</string>
+    <string name="log_job_cancelled">Job %1$d: cancelled.</string>
+    <string name="log_job_failed">Job %1$d: FAILED rc=%2$d\n%3$s</string>
+    <plurals name="log_encoder_detected">
+        <item quantity="one">Encoder detection: %1$d total.</item>
+        <item quantity="other">Encoder detection: %1$d total.</item>
+    </plurals>
+    <string name="log_diagnostics_start">Engine diagnostics…</string>
+    <string name="log_diagnostics_failed">diagnostics failed: %1$s</string>
+    <string name="log_diagnostics_ffmpeg">ffmpeg: %1$s (rc=%2$s)</string>
+    <string name="log_diagnostics_encoder_count">encoder lines: %1$d, video: %2$d</string>
+    <string name="log_diagnostics_video_encoders">video encoders:</string>
+    <string name="log_diagnostics_decoder_count">decoder lines: %1$d, mediacodec: %2$d</string>
+    <string name="log_empty">(empty)</string>
+<string name="log_no_output">(no output)</string>
+<string name="log_output_fallback">Selected folder is unavailable — writing to the app folder.</string>
+<string name="log_engine_ready">eBrake ready. ffmpeg-kit-next engine linked.</string>
+</resources>
