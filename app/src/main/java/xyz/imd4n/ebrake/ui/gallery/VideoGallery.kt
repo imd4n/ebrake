@@ -324,7 +324,10 @@ private fun formatDuration(ms: Long): String {
     val h = totalSec / 3600
     val m = (totalSec % 3600) / 60
     val s = totalSec % 60
-    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+    // Локаль фиксируем: %d на некоторых локалях (например арабской) подставляет
+    // восточно-арабские цифры, и таймкод в галерее выглядит чужеродно.
+    val loc = Locale.forLanguageTag("ru")
+    return if (h > 0) "%d:%02d:%02d".format(loc, h, m, s) else "%d:%02d".format(loc, m, s)
 }
 
 /** Границы декодируемой обложки, px: снизу — чтобы не декодировать 20px, сверху — кэш. */

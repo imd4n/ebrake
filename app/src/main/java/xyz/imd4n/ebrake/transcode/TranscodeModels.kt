@@ -1,6 +1,7 @@
 package xyz.imd4n.ebrake.transcode
 
 import android.net.Uri
+import java.util.Locale
 
 /**
  * Движок кодирования для одного задания.
@@ -235,16 +236,21 @@ object TranscodeFormat {
     /** Длина превью-отрезка для сравнения качества, сек. */
     const val PREVIEW_SEC = 10
 
+    // Формат фиксирован, а не Locale.getDefault(): единицы здесь русские
+    // («МБ», «ГБ»), поэтому и разделитель должен быть запятой. С локалью
+    // устройства на английском получалось «31.3 МБ», а тесты на CI падали.
+    private val RU = Locale.forLanguageTag("ru")
+
     fun formatBytes(b: Long): String = when {
-        b >= 1_000_000_000 -> "%.1f ГБ".format(b / 1_000_000_000.0)
-        b >= 1_000_000 -> "%.1f МБ".format(b / 1_000_000.0)
-        b >= 1_000 -> "%.0f КБ".format(b / 1_000.0)
+        b >= 1_000_000_000 -> "%.1f ГБ".format(RU, b / 1_000_000_000.0)
+        b >= 1_000_000 -> "%.1f МБ".format(RU, b / 1_000_000.0)
+        b >= 1_000 -> "%.0f КБ".format(RU, b / 1_000.0)
         else -> "$b Б"
     }
 
     fun formatSec(d: Double): String {
         val s = d.toInt()
-        return "%d:%02d".format(s / 60, s % 60)
+        return "%d:%02d".format(RU, s / 60, s % 60)
     }
 
     /** Дельта размера со знаком: «−132,0 МБ» / «+4,1 МБ». */
