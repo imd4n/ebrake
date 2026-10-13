@@ -1,9 +1,9 @@
 name: Build
 
-# Проверка сборки на каждом пуше и PR. Релизы собирает release.yml по тегу.
+# РџСЂРѕРІРµСЂРєР° СЃР±РѕСЂРєРё РЅР° РєР°Р¶РґРѕРј РїСѓС€Рµ Рё PR. Р РµР»РёР·С‹ СЃРѕР±РёСЂР°РµС‚ release.yml РїРѕ С‚РµРіСѓ.
 on:
   push:
-    # Обе рабочие ветки: dev — разработка, release — то, что уедет в релиз.
+    # РћР±Рµ СЂР°Р±РѕС‡РёРµ РІРµС‚РєРё: dev вЂ” СЂР°Р·СЂР°Р±РѕС‚РєР°, release вЂ” С‚Рѕ, С‡С‚Рѕ СѓРµРґРµС‚ РІ СЂРµР»РёР·.
     branches: [dev, release]
   pull_request:
   workflow_dispatch:
@@ -13,31 +13,39 @@ permissions:
 
 jobs:
   build:
-    name: Сборка debug APK
+    name: РЎР±РѕСЂРєР° debug APK
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
 
+      # РќРµ android-actions/setup-android: РѕРЅ РґС‘СЂРіР°РµС‚ `sdkmanager tools`, Р° РїР°РєРµС‚
+      # tools СѓРґР°Р»С‘РЅ РёР· СЂРµРїРѕР·РёС‚РѕСЂРёСЏ Google Рё С€Р°Рі РІР°Р»РёС‚ СЃР±РѕСЂРєСѓ. РќР° РѕР±СЂР°Р·Рµ runner
+      # cmdline-tools СѓР¶Рµ РµСЃС‚СЊ вЂ” РїСЂРёРЅРёРјР°РµРј licenses, Р° РЅРµРґРѕСЃС‚Р°СЋС‰РёРµ РєРѕРјРїРѕРЅРµРЅС‚С‹
+      # (platform 36.1, build-tools) РґРѕСЃС‚Р°РІРёС‚ СЃР°Рј AGP.
       - name: Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          SDKMANAGER="$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | tail -1)"
+          echo "sdkmanager: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
 
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      # Юнит-тесты (экономия, формат размеров) + сборка APK.
-      - name: Тесты и сборка
+      # Р®РЅРёС‚-С‚РµСЃС‚С‹ (СЌРєРѕРЅРѕРјРёСЏ, С„РѕСЂРјР°С‚ СЂР°Р·РјРµСЂРѕРІ) + СЃР±РѕСЂРєР° APK.
+      - name: РўРµСЃС‚С‹ Рё СЃР±РѕСЂРєР°
         run: ./gradlew :app:testDebugUnitTest :app:assembleDebug
 
-      # Артефакт удобно тянуть из вкладки Actions, не дожидаясь релиза.
-      - name: Приложить APK
+      # РђСЂС‚РµС„Р°РєС‚ СѓРґРѕР±РЅРѕ С‚СЏРЅСѓС‚СЊ РёР· РІРєР»Р°РґРєРё Actions, РЅРµ РґРѕР¶РёРґР°СЏСЃСЊ СЂРµР»РёР·Р°.
+      - name: РџСЂРёР»РѕР¶РёС‚СЊ APK
         uses: actions/upload-artifact@v4
         with:
           name: eBrake-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
+
