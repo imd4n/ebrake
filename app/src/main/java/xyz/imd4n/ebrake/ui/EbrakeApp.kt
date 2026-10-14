@@ -23,6 +23,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.launch
 import xyz.imd4n.ebrake.R
 import xyz.imd4n.ebrake.transcode.TranscodeViewModel
@@ -42,6 +44,10 @@ fun EbrakeApp(vm: TranscodeViewModel) {
     val pagerState = rememberPagerState(pageCount = { Tabs.size })
     var selectedTab by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
+    // Общее состояние стекла: источники — страницы под доком, потребитель —
+    // сам док. Одно на все вкладки, потому что док один и не пересоздаётся
+    // при свайпе.
+    val hazeState = remember { HazeState() }
 
     // Свайп обновляет подсветку дока.
     LaunchedEffect(pagerState.currentPage) {
@@ -58,13 +64,17 @@ fun EbrakeApp(vm: TranscodeViewModel) {
         ) {
             HorizontalPager(
                 state = pagerState,
+                // Никакого нижнего отступа здесь: док парит над содержимым на
+                // всех трёх вкладках. Списки «Правки» и «Вывода» добавляют
+                // отступ себе через contentPadding — контент уходит под пилюлю
+                // и прокручивается из-под неё, а не обрывается над ней.
+                // hazeSource: страницы — источник пикселей для стекла дока.
                 modifier = Modifier
                     .fillMaxSize()
-                    // Контент должен заканчиваться выше парящего дока.
-                    .padding(bottom = DockMetrics.ContentBottom),
+                    .hazeSource(hazeState),
             ) { page ->
                 when (page) {
-                    0 -> InputScreen(vm, state)
+                    0 -> InputScreen(vm, state, hazeState)
                     1 -> EditScreen(vm, state)
                     else -> OutputScreen(vm, state)
                 }
@@ -81,6 +91,7 @@ fun EbrakeApp(vm: TranscodeViewModel) {
                     .padding(bottom = DockMetrics.BottomMargin)
                     .fillMaxWidth(0.88f)
                     .widthIn(max = 380.dp),
+                hazeState = hazeState,
             )
         }
     }

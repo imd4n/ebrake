@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,6 +30,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.annotation.StringRes
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeDefaults
+import dev.chrisbanes.haze.hazeEffect
 
 /**
  * Пункт левитирующего дока.
@@ -41,8 +43,15 @@ import androidx.annotation.StringRes
 data class DockTab(@param:StringRes val titleRes: Int, val icon: ImageVector)
 
 /**
- * Левитирующий док в духе ReFra: полупрозрачная пилюля с тенью, парящая над
- * контентом, а выбранный пункт подсвечен такой же пилюлей внутри.
+ * Левитирующий док в духе ReFra: стеклянная пилюля с тенью, парящая над
+ * контентом, а выбранный пункт подсвечен чипом внутри.
+ *
+ * Стекло — Haze ([hazeState]): контент под пилюлей размывается внутри той же
+ * композиции. Системный `FLAG_BLUR_BEHIND` в отдельном окне не подошёл: на
+ * части прошивок (HyperOS) он игнорируется, а позиция окна трижды уезжала
+ * (разбор — в docs/DOCK_BLUR.md). Haze от прошивки не зависит: `SurfaceView`
+ * плеера на «Правке» в блюр не попадает (поверхность рисуется мимо Compose),
+ * остальное — да.
  *
  * Ширина задаётся вызывающим (`fillMaxWidth` + `widthIn`), потому что пункты
  * равновесные: без ограничения по ширине док схлопнется в три квадратика.
@@ -53,15 +62,31 @@ fun FloatingDock(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    /** null = без стекла, просто полупрозрачная подложка (превью, тесты). */
+    hazeState: HazeState? = null,
 ) {
     val shape = RoundedCornerShape(DockMetrics.Radius)
+    // Haze рисует размытый контент + фон сам, поэтому свой .background здесь
+    // не кладём, когда стекло включено: иначе подложка легла бы поверх блюра
+    // и съела его. Без Haze — прежняя полупрозрачная заливка.
+    val glass = if (hazeState != null) {
+        Modifier.hazeEffect(
+            state = hazeState,
+            style = HazeDefaults.style(
+                backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
+                blurRadius = DOCK_BLUR_RADIUS,
+            ),
+        )
+    } else {
+        Modifier.background(MaterialTheme.colorScheme.surface.copy(alpha = 0.72f))
+    }
     Row(
         modifier = modifier
             // Тень рисуется по форме пилюли и создаёт «парение» над контентом.
-            .shadow(16.dp, shape, clip = false)
+            .shadow(18.dp, shape, clip = false)
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.88f))
-            .border(1.dp, Color.White.copy(alpha = 0.07f), shape)
+            .then(glass)
+            .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
             .height(DockMetrics.Height)
             .padding(horizontal = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -102,7 +127,11 @@ fun FloatingDock(
                     // Тот же радиус, что у пилюли дока: кривизна чипа продолжает
                     // кривизну подложки, а не спорит с ней.
                     .clip(RoundedCornerShape(DockMetrics.Radius))
-                    .background(background)
+                    // Чип рисуется поверх стекла: свой фон ему нужен всегда,
+                    // иначе выбранный пункт потеряется на размытом контенте.
+                    .then(
+                        Modifier.background(background),
+                    )
                     .clickable(
                         interactionSource = interaction,
                         indication = null,
@@ -146,3 +175,6 @@ object DockMetrics {
     /** Отступ снизу для контента: сама пилюля + воздух под ней. */
     val ContentBottom = Height + BottomMargin * 2
 }
+
+/** Радиус гауссова размытия под пилюлей. Больше — дороже на слабых чипах. */
+private val DOCK_BLUR_RADIUS = 22.dp

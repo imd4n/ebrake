@@ -26,6 +26,11 @@
     <string name="action_diagnostics">Диагностика</string>
     <string name="action_allow">Разрешить</string>
     <string name="action_pick_manually">Выбрать вручную</string>
+    <string name="action_close">Закрыть</string>
+    <string name="action_back">Назад</string>
+    <string name="action_clear_selection">Сбросить отметки</string>
+    <string name="action_compare_this">Сравнить этот ролик</string>
+    <string name="action_inspect">Технические подробности</string>
 
     <!-- ══════════════ Ввод ══════════════ -->
     <string name="input_source">Источник: %1$s</string>
@@ -33,23 +38,22 @@
     <string name="input_none_selected">Файл не выбран</string>
     <string name="input_pick_hint">Выбери видео на экране «Ввод»</string>
     <string name="input_reading">Читаю метаданные…</string>
-    <string name="input_selection_first">1 — «%1$s» на сравнение</string>
-    <string name="input_selected_single">Отмечено: %1$d</string>
     <!-- Имя файла, если провайдер не отдал своё: нейтрально, без перевода. -->
     <string name="input_fallback_name" translatable="false">video</string>
 
-    <plurals name="input_selection_count">
-        <item quantity="one">Отмечено: %1$d · в очередь: %2$d</item>
-        <item quantity="few">Отмечено: %1$d · в очередь: %2$d</item>
-        <item quantity="many">Отмечено: %1$d · в очередь: %2$d</item>
-        <item quantity="other">Отмечено: %1$d · в очередь: %2$d</item>
-    </plurals>
+    <!-- Карточка отбора над доком и её полноэкранный слой. -->
+    <string name="input_grid_mode">Вид сетки</string>
+    <string name="input_grid_dense">Ровная сетка, 4 в ряд</string>
+    <string name="input_grid_dated">Разбивка по датам</string>
+    <string name="selected_title">Выбранные ролики</string>
+    <string name="selected_total_size">общий размер %1$s</string>
+    <string name="selected_size_unknown">общий размер неизвестен</string>
 
-    <plurals name="action_import">
-        <item quantity="one">Импорт: %1$d</item>
-        <item quantity="few">Импорт: %1$d</item>
-        <item quantity="many">Импорт: %1$d</item>
-        <item quantity="other">Импорт: %1$d</item>
+    <plurals name="selected_count">
+        <item quantity="one">Выбран %1$d ролик</item>
+        <item quantity="few">Выбрано %1$d ролика</item>
+        <item quantity="many">Выбрано %1$d роликов</item>
+        <item quantity="other">Выбрано %1$d ролика</item>
     </plurals>
 
     <!-- ══════════════ Правка ══════════════ -->
@@ -58,10 +62,12 @@
     <string name="edit_engine_fallback">При сравнении недоступный движок автоматически заменяется доступным.</string>
     <string name="edit_compare">Сравнить 3 уровня</string>
     <string name="edit_compare_title">Сравнение качества</string>
-    <string name="edit_compare_hint">Запусти «Сравнить 3 уровня» — превью появятся здесь.</string>
+    <string name="edit_compare_hint">Нажми «Сравнить 3 уровня» и выбери ролик из отмеченных на «Вводе».</string>
+    <string name="edit_compare_needs_selection">Сначала отметьте хотя бы один ролик на «Вводе».</string>
     <string name="edit_compare_meta">%1$s · %2$s · превью %3$d сек</string>
     <string name="edit_preview_placeholder">Превью появится здесь после сравнения.</string>
-    <string name="edit_take_to_queue">Взять «%1$s» в очередь</string>
+    <string name="edit_take_to_queue">Взять в очередь: %1$s</string>
+    <string name="edit_queue_empty">Ничего не отмечено на «Вводе» — в очередь брать нечего.</string>
     <string name="level_label">Уровень: %1$s</string>
     <string name="engine_not_in_build">нет в сборке</string>
     <string name="cd_preview_fullscreen">Открыть превью на весь экран</string>
@@ -97,7 +103,7 @@
     <!-- ══════════════ Вывод ══════════════ -->
     <string name="output_to">Вывод в: %1$s</string>
     <string name="queue_running_suffix"> · идёт кодирование…</string>
-    <string name="queue_empty">Очередь пуста. Отметь ролики на «Вводе» и нажми «Импорт» или «Взять в очередь» на «Правке».</string>
+    <string name="queue_empty">Очередь пуста. Отметьте ролики на «Вводе» и нажмите «В очередь».</string>
     <string name="done_saved">Сэкономлено %1$s из %2$s</string>
     <string name="done_saved_percent">Сэкономлено %1$s из %2$s (%3$d%%)</string>
     <string name="done_no_savings">без экономии</string>
@@ -141,7 +147,7 @@
     <string name="meta_read_error">Ошибка чтения: %1$s</string>
     <string name="meta_no_media_information">FFprobe не смог прочитать файл.</string>
     <string name="stream_video">видео: %1$s %2$dx%3$d %4$s fps</string>
-    <string name="stream_audio">аудио: %1$s %2$d Hz</string>
+    <string name="stream_audio">аудио: %1$s %2$s Hz</string>
     <string name="stream_other">%1$s: %2$s</string>
 
     <!-- ══════════════ Даты в галерее ══════════════ -->
@@ -187,17 +193,16 @@
     <string name="log_compare_done">Сравнение готово: выбери уровень кнопкой под карточкой.</string>
     <string name="log_compare_cancelled">Сравнение отменено.</string>
     <string name="log_compare_cancel_requested">Сравнение: отмена запрошена…</string>
-    <string name="log_queue_nothing">Очередь: нечего добавлять — выбери файл.</string>
+    <string name="log_queue_nothing">Очередь: нечего добавлять — отметьте ролики на «Вводе».</string>
     <string name="log_queue_cancel_requested">Очередь: отмена запрошена…</string>
     <string name="log_queue_finished">Очередь: обработка завершена.</string>
     <string name="log_job_starting">Задание %1$d: %2$s — кодирую…</string>
     <string name="log_input_open_failed">Задание %1$d: не смог открыть вход: %2$s</string>
-    <string name="log_import_too_few">Импорт: отметь хотя бы два ролика — первый идёт на сравнение.</string>
     <plurals name="log_import_done">
-        <item quantity="one">Импорт: в очередь ушло %1$d из %2$d. Сравнение — по «%3$s».</item>
-        <item quantity="few">Импорт: в очередь ушло %1$d из %2$d. Сравнение — по «%3$s».</item>
-        <item quantity="many">Импорт: в очередь ушло %1$d из %2$d. Сравнение — по «%3$s».</item>
-        <item quantity="other">Импорт: в очередь ушло %1$d из %2$d. Сравнение — по «%3$s».</item>
+        <item quantity="one">Очередь: добавлен %1$d из %2$d.</item>
+        <item quantity="few">Очередь: добавлено %1$d из %2$d.</item>
+        <item quantity="many">Очередь: добавлено %1$d из %2$d.</item>
+        <item quantity="other">Очередь: добавлено %1$d из %2$d.</item>
     </plurals>
     <string name="log_already_queued">Уже в очереди: %1$s — пропускаю.</string>
     <string name="log_enqueued">В очередь добавлено: %1$s [%2$s]</string>

@@ -74,6 +74,9 @@ class PreviewPlayerHolder(context: Context) {
 
     private var loadedPath: String? = null
     private var loadedRunId = 0
+
+    /** true, если сейчас играет системный Uri из галереи, а не файл из cacheDir. */
+    private var loadedIsSource = false
     /** Кэш позиции: нужен, пока MediaItem не готов и currentPosition ещё невалиден. */
     private var positionMs = 0L
     private var playWhenReady = false
@@ -127,6 +130,35 @@ class PreviewPlayerHolder(context: Context) {
         playWhenReady = resumePlaying
         loadedPath = path
         loadedRunId = runId
+    }
+
+    /**
+     * Тот же ролик, но из галереи телефона, а не из cacheDir: Uri системный
+     * (`content://media/...` или SAF), и Media3 открывает его сам. Отдельный
+     * метод, а не перегрузка [load]: там проверка `File(path).exists()`, а у
+     * документа SAF её не пройти.
+     */
+    fun loadSource(uri: Uri) {
+        val key = uri.toString()
+        if (key == loadedPath && loadedIsSource) return
+        savePosition()
+        player.setMediaItem(MediaItem.fromUri(uri), 0L)
+        player.prepare()
+        player.playWhenReady = false
+        positionMs = 0L
+        playWhenReady = false
+        loadedPath = key
+        loadedIsSource = true
+    }
+
+    /** Прекратить показ ролика из галереи (карточка отбора закрыта). */
+    fun stopSource() {
+        if (!loadedIsSource) return
+        player.stop()
+        loadedPath = null
+        loadedIsSource = false
+        positionMs = 0L
+        playWhenReady = false
     }
 
     private fun savePosition() {

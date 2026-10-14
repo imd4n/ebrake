@@ -7,4 +7,12 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!--
+      Фон окна до первой композиции Compose. Тема приложения всегда тёмная
+      (см. EbrakeTheme), но системная тема была Material.Light, и между стартом
+      окна и первым кадром Compose на экране успевал мелькнуть белый прямоугольник.
+      Значение обязано совпадать с EbrakeBackground из Theme.kt.
+    -->
+    <color name="ebrake_window_background">#101014</color>
 </resources>

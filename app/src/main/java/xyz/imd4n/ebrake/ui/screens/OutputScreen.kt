@@ -49,6 +49,7 @@ import xyz.imd4n.ebrake.transcode.TranscodeFormat.formatBytes
 import xyz.imd4n.ebrake.transcode.TranscodeFormat.formatDelta
 import xyz.imd4n.ebrake.transcode.TranscodeUiState
 import xyz.imd4n.ebrake.transcode.TranscodeViewModel
+import xyz.imd4n.ebrake.ui.DockMetrics
 import xyz.imd4n.ebrake.ui.VideoThumbnail
 import xyz.imd4n.ebrake.ui.theme.LogTextStyle
 
@@ -66,7 +67,11 @@ fun OutputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
     ) { uri -> vm.setOutputTree(uri) }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        // Отступ снизу — высота дока: док рисуется поверх содержимого, и без
+        // этого нижние кнопки уезжали бы под пилюлю намертво.
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = DockMetrics.ContentBottom),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(
@@ -80,7 +85,7 @@ fun OutputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
             Button(
                 // Добавление в очередь во время кодирования безопасно: цикл
                 // сервиса подхватит новые задания после текущего.
-                onClick = { vm.enqueueSelected() },
+                onClick = { vm.enqueueChecked() },
                 modifier = Modifier.weight(1f),
             ) { Text(stringResource(R.string.action_enqueue)) }
             if (state.queueRunning) {

@@ -51,8 +51,8 @@ android {
         // versionCode растёт монотонно и никогда не переиспользуется: по нему
         // F-Droid и Google Play отслеживают обновления, по нему же Android
         // понимает «обновление», а не «другое приложение».
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -83,7 +83,12 @@ android {
             // keystore.properties или Secrets — см. блок выше.
             signingConfig = signingConfigs.getByName(if (hasReleaseKey) "release" else "debug")
             optimization {
-                enable = false
+                // R8: шейкинг кода + ресурсов. Без этого dex в release попадает
+                // целиком (~47 МБ распакованных) и ART раздувает его при
+                // установке вдвое. AGP 9.3 сам подключает proguard-android-optimize.txt
+                // и consumer-правила зависимостей; свои правила — в
+                // app/src/main/keepRules/*.keep (не в proguard-rules.pro).
+                enable = true
             }
         }
     }
@@ -127,6 +132,10 @@ dependencies {
     // Плееры превью-сравнения (BOM у Media3 нет — версии в TOML).
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
+    // Стекло дока: Haze размывает контент под пилюлей внутри той же композиции.
+    // Системный FLAG_BLUR_BEHIND на части прошивок (HyperOS) игнорируется,
+    // поэтому отдельное окно не давало стекла — только проблемы с позицией.
+    implementation(libs.haze)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

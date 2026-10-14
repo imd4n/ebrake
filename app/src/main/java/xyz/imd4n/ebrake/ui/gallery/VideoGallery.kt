@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,11 +17,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -37,33 +38,41 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import xyz.imd4n.ebrake.R
 import xyz.imd4n.ebrake.transcode.TranscodeFormat
+import xyz.imd4n.ebrake.ui.DockMetrics
 
 /**
- * Галерея роликов в духе ReFra: сетка обложек, разбитая по датам
- * («Сегодня», «Вчера», «12 сентября»).
+ * Галерея роликов: сетка обложек во весь экран, четыре плитки в ряд, без полей
+ * и без скруглений. Между плитками — тонкий зазор в [GUTTER], сквозь который
+ * виден фон сетки: это и есть разделители, отдельная рамка на каждой плитке
+ * давала бы двойную линию.
  *
- * Подписи под плитками убраны: в превью всё равно нужен только кадр, а имена
- * съедали высоту — на телефоне в сетку влезало четыре ряда вместо шести.
+ * Под плитками подписей нет: в превью важен только кадр, а имя съедало бы
+ * высоту и в четыре колонки поместилось бы три ряда вместо шести.
  *
- * Мультивыбор: тап добавляет ролик в отметку и рисует его порядковый номер.
- * Первый отмеченный идёт на сравнение качества, остальные — на импорт с
- * текущим уровнем (см. [xyz.imd4n.ebrake.transcode.TranscodeViewModel.importRest]).
+ * Мультивыбор: тап ставит и снимает галочку в углу. Смысла «первый идёт на
+ * сравнение» больше нет — ролик для сравнения выбирается отдельно, на «Правке».
+ *
+ * [denseGrid] переключает раскладку: true — ровная сетка, false — с разбивкой
+ * по датам («Сегодня», «Вчера», «12 сентября»). Заголовок даты в плотной сетке
+ * стоил бы целого ряда, поэтому в ней он убран.
  *
  * Источник роликов: выбранная папка SAF, иначе MediaStore. Без доступа к медиа
  * показываем пустое состояние с кнопкой «Выбрать вручную» — путь, который
@@ -71,19 +80,23 @@ import xyz.imd4n.ebrake.transcode.TranscodeFormat
  */
 @Composable
 fun VideoGallery(
-    /** Отмеченные ролики в порядке нажатий: первый — под сравнение. */
+    /** Отмеченные ролики как строки Uri — в таком виде их держит состояние. */
     selection: List<String>,
     /** Выбранная папка SAF; null = весь MediaStore. */
     treeUri: Uri?,
     hasPermission: Boolean,
+    denseGrid: Boolean,
     onToggle: (VideoItem) -> Unit,
     onRequestPermission: () -> Unit,
     onPickManually: () -> Unit,
     onShowAll: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    /** Отступ сверху под плавающую шапку экрана. */
+    topInset: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     val context = LocalContext.current
     var items by remember { mutableStateOf<List<VideoItem>?>(null) }
+    val gridState = rememberLazyGridState()
     // null = грузим, пустой список = загрузили и ничего не нашли.
     val loadingKey = listOf(hasPermission, treeUri)
     LaunchedEffect(loadingKey) {
@@ -94,8 +107,7 @@ fun VideoGallery(
         }
     }
 
-    // Порядковые номера отметок: позиция в списке = место в сравнении/очереди.
-    val order = remember(selection) { selection.withIndex().associate { it.value to it.index + 1 } }
+    val marked = remember(selection) { selection.toSet() }
 
     val loaded = items
     when {
@@ -133,134 +145,216 @@ fun VideoGallery(
         else -> {
             // Секции считаем до сетки: её content-лямбда не @Composable, и
             // stringResource внутри неё не вызвать.
-            val sections = dateSections(loaded)
-            LazyVerticalGrid(
-                // Квадраты одинаковой высоты → лесенка не нужна, обычная сетка.
-                columns = GridCells.Fixed(3),
-                modifier = modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-            sections.forEach { (label, section) ->
-                item(key = "section_$label", span = { GridItemSpan(maxLineSpan) }) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.padding(start = 4.dp, top = 12.dp, bottom = 2.dp),
-                    )
-                }
-                items(section, key = { it.uri.toString() }) { item ->
-                    GalleryTile(
-                        item = item,
-                        order = order[item.uri.toString()],
-                        onClick = { onToggle(item) },
-                    )
+            val sections = if (denseGrid) emptyList() else dateSections(loaded)
+            // Порядок элементов ровно такой, как в сетке, заголовками дат
+            // включительно (они помечены null). Нужен предзагрузке, чтобы
+            // «две строки вперёд» считались по индексам сетки, а не по
+            // отдельному списку, который рано или поздно разошёлся бы с ней.
+            val gridOrder: List<VideoItem?> = if (denseGrid) {
+                loaded.map { it as VideoItem? }
+            } else {
+                buildList {
+                    sections.forEach { (_, section) ->
+                        add(null)
+                        addAll(section)
+                    }
                 }
             }
+            val gridModifier = modifier
+                .fillMaxSize()
+                // Фон сетки виден в зазорах — это и есть тонкие разделители.
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                .padding(top = topInset)
+
+            BoxWithConstraints(modifier = gridModifier) {
+                // Ширина плитки считается один раз здесь и передаётся вниз:
+                // ключ кэша обложки включает ширину, и если плитка запросит
+                // «немного другую», предзагрузка окажется впустую.
+                val coverPx = with(LocalDensity.current) {
+                    (maxWidth / GALLERY_COLUMNS).toPx()
+                }.toInt().coerceIn(MIN_COVER_PX, MAX_COVER_PX)
+
+                CoverPrefetch(gridState, gridOrder, coverPx)
+
+                LazyVerticalGrid(
+                    state = gridState,
+                    columns = GridCells.Fixed(GALLERY_COLUMNS),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(0.dp),
+                    horizontalArrangement = Arrangement.spacedBy(GUTTER),
+                    verticalArrangement = Arrangement.spacedBy(GUTTER),
+                ) {
+                if (denseGrid) {
+                    items(loaded, key = { it.uri.toString() }) { item ->
+                        GalleryTile(
+                            item = item,
+                            coverPx = coverPx,
+                            marked = item.uri.toString() in marked,
+                            onClick = { onToggle(item) },
+                        )
+                    }
+                } else {
+                    sections.forEach { (label, section) ->
+                        item(key = "section_$label", span = { GridItemSpan(maxLineSpan) }) {
+                            // Зазор слева/справа сохраняем, иначе заголовок
+                            // прилипает к краю экрана, а сетка — нет.
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.background)
+                                    .padding(start = 12.dp, top = 14.dp, bottom = 6.dp),
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
+                            }
+                        }
+                        items(section, key = { it.uri.toString() }) { item ->
+                            GalleryTile(
+                                item = item,
+                                coverPx = coverPx,
+                                marked = item.uri.toString() in marked,
+                                onClick = { onToggle(item) },
+                            )
+                        }
+                    }
+                }
             }
         }
     }
+}
 }
 
 @Composable
 private fun GalleryTile(
     item: VideoItem,
-    /** Номер отметки (1 = под сравнение) или null, если ролик не отмечен. */
-    order: Int?,
+    /** Ширина обложки в px — считается один раз на всю сетку, не на плитку. */
+    coverPx: Int,
+    marked: Boolean,
     onClick: () -> Unit,
 ) {
     val context = LocalContext.current
     val locale = TranscodeFormat.currentLocale(context)
-    val selected = order != null
-    Column(
+    Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .then(
-                if (selected) {
-                    Modifier.border(
-                        width = 2.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                        shape = RoundedCornerShape(12.dp),
-                    )
-                } else {
-                    Modifier
-                },
-            )
+            .fillMaxWidth()
+            // Углы острые: скругление здесь означало бы ещё и чёрные углы
+            // подложки, и в четырёх рядах сетка выглядела бы рваной.
             .clickable(onClick = onClick),
     ) {
-        // Обложку тянем под реальную ширину плитки: на планшете сетка шире, и кадр
-        // должен быть резче. Верхняя отсечка держит кэш в разумных рамках —
-        // на 3x экране без неё одна картинка весит ~0.5 МБ.
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val coverPx = with(LocalDensity.current) { maxWidth.toPx() }
-                .toInt()
-                .coerceIn(MIN_COVER_PX, MAX_COVER_PX)
-            val cover by produceState<Bitmap?>(
-                initialValue = null,
-                key1 = item.uri,
-                key2 = coverPx,
-            ) {
-                value = VideoLibrary.cover(context, item.uri, coverPx)
-            }
+        val cover by produceState<Bitmap?>(
+            initialValue = null,
+            key1 = item.uri,
+            key2 = coverPx,
+        ) {
+            value = VideoLibrary.cover(context, item.uri, coverPx)
+        }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    // Квадрат под кадр: обложка кропается по центру, поэтому
-                    // вертикальные ролики не превращают плитку в колонку.
-                    .aspectRatio(1f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-            ) {
-                val bitmap = cover
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    // Обложка ещё декодируется — заглушка, чтобы не мигало.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                // Квадрат под кадр: обложка кропается по центру, поэтому
+                // вертикальные ролики не превращают плитку в колонку.
+                .aspectRatio(1f)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            val bitmap = cover
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                // Обложка ещё декодируется — заглушка, чтобы не мигало.
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.align(Alignment.Center),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                )
+            }
+            if (marked) {
+                // Галочка, а не порядковый номер: номер был нужен только
+                // чтобы различать «сравнение» и «очередь», а теперь
+                // отметка одна на всех.
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp)
+                        .size(CHECK_SIZE)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
                     Icon(
-                        imageVector = Icons.Filled.PlayArrow,
+                        imageVector = Icons.Filled.Check,
                         contentDescription = null,
-                        modifier = Modifier.align(Alignment.Center),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(CHECK_SIZE * 0.6f),
                     )
                 }
-                if (selected) {
-                    // Номер отметки объясняет, кто пойдёт на сравнение, а кто
-                    // просто в очередь — иначе отметки выглядят одинаковыми.
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(6.dp)
-                            .size(BADGE_SIZE)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = order.toString(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    }
-                }
-                if (item.durationMs > 0) {
-                    Text(
-                        text = formatDuration(item.durationMs, locale),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(6.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.Black.copy(alpha = 0.55f))
-                            .padding(horizontal = 5.dp, vertical = 2.dp),
-                    )
-                }
+            }
+            if (item.durationMs > 0) {
+                Text(
+                    text = formatDuration(item.durationMs, locale),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(4.dp)
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .padding(horizontal = 4.dp, vertical = 1.dp),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Заблаговременная подгрузка обложек вокруг видимой области.
+ *
+ * Без неё каждая плитка грузится только в момент появления, и на любом
+ * замере, дольше чтения одного кадра, сетка «дышит» — телефону видно, как он
+ * то подгружает, то выгружает превью.
+ *
+ * Два свойства:
+ *  - **пауза на скролле.** Пока идёт прокрутка, декодирование не запускается
+ *    вовсе: [collectLatest] отменяет текущую загрузку при каждом новом
+ *    состоянии и ждёт, пока сетка остановится. Догонять кадры на ходу —
+ *    значит гарантированно не успевать и дёргать список;
+ *  - **пауза нужна и во время медленного перетаскивания**, поэтому
+ *    [SETTLE_MS] откладывает старт: палец «дёрнулся — отпустил — потянул
+ *    снова» не должен запускать декодирование каждый раз.
+ *
+ * Назад подгружаем на [PREFETCH_ROWS_BACK] строк, вперёд — на
+ * [PREFETCH_ROWS_AHEAD]: при возврате вверх попадаем в кэш, а не в пропасть.
+ */
+@Composable
+private fun CoverPrefetch(
+    gridState: LazyGridState,
+    order: List<VideoItem?>,
+    coverPx: Int,
+) {
+    val context = LocalContext.current
+    LaunchedEffect(gridState, order, coverPx) {
+        snapshotFlow {
+            val info = gridState.layoutInfo
+            val first = info.visibleItemsInfo.firstOrNull()?.index ?: 0
+            val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            Triple(first, last, gridState.isScrollInProgress)
+        }.collectLatest { (first, last, scrolling) ->
+            if (scrolling) {
+                // Ждём отката назад: сетка встала — можно догонять.
+                delay(SETTLE_MS)
+                return@collectLatest
+            }
+            val from = (first - PREFETCH_ROWS_BACK * GALLERY_COLUMNS).coerceAtLeast(0)
+            val to = (last + PREFETCH_ROWS_AHEAD * GALLERY_COLUMNS).coerceAtMost(order.lastIndex)
+            for (i in from..to) {
+                val item = order.getOrNull(i) ?: continue
+                VideoLibrary.prefetch(context, item.uri, coverPx)
             }
         }
     }
@@ -274,9 +368,11 @@ private fun GalleryMessage(
     modifier: Modifier = Modifier,
 ) {
     Column(
+        // Отступ снизу — высота дока: док парит поверх всего, и без этого
+        // «Разрешить» и «Выбрать вручную» оказывались ровно под пилюлёй.
         modifier = modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = DockMetrics.ContentBottom),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -341,7 +437,7 @@ private fun dateSections(items: List<VideoItem>): List<Pair<String, List<VideoIt
  * (например арабской) подставляет восточно-арабские цифры, и таймкод рядом
  * с латиницей выглядит чужеродно. Язык приложения указывает и на разделитель.
  */
-private fun formatDuration(ms: Long, locale: Locale): String {
+internal fun formatDuration(ms: Long, locale: Locale): String {
     val totalSec = ms / 1000
     val h = totalSec / 3600
     val m = (totalSec % 3600) / 60
@@ -357,5 +453,23 @@ private fun formatDuration(ms: Long, locale: Locale): String {
 private const val MIN_COVER_PX = 200
 private const val MAX_COVER_PX = 720
 
-/** Кружок с номером отметки в углу плитки. */
-private val BADGE_SIZE = 22.dp
+/** Плиток в ряду. Четыре — компромисс: на 360dp это 90dp, кадр ещё узнаваем. */
+const val GALLERY_COLUMNS = 4
+
+/** Зазор между плитками: сквозь него виден фон сетки — это и разделители. */
+val GUTTER = 1.dp
+
+/** Галочка отметки в углу плитки. */
+private val CHECK_SIZE = 20.dp
+
+/** Строк вперёд грузим до того, как пользователь до них доедет. */
+private const val PREFETCH_ROWS_AHEAD = 3
+
+/** Строк назад: возврат вверх должен попадать в кэш, а не декодироваться заново. */
+private const val PREFETCH_ROWS_BACK = 1
+
+/**
+ * Пауза после остановки сетки перед стартом догрузки. Без неё «дёрнул —
+ * отпустил — потянул» запускал бы декодирование на каждом микросдвиге.
+ */
+private const val SETTLE_MS = 120L

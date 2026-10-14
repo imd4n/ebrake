@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.Ebrake" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      Material (без .Light), а не Material.Light: окно рисуется раньше первого
+      кадра Compose, и светлая системная тема давала белый прямоугольник при
+      запуске. windowBackground дублирует фон палитры — иначе «размытие» между
+      стартом окна и содержимым всё равно заметно на тёмном фоне.
+      Значения insets/windowLightStatusBar — чтобы и системные панели были
+      тёмными с первой секунды.
+    -->
+    <style name="Theme.Ebrake" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/ebrake_window_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 </resources>

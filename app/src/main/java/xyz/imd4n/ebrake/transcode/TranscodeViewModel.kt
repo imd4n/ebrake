@@ -22,6 +22,7 @@ import xyz.imd4n.ebrake.transcode.TranscodeFormat.PREVIEW_SEC
 import xyz.imd4n.ebrake.transcode.TranscodeFormat.formatBytes
 import xyz.imd4n.ebrake.transcode.TranscodeFormat.formatSec
 import xyz.imd4n.ebrake.transcode.TranscodeFormat.lastLogLines
+import xyz.imd4n.ebrake.ui.gallery.VideoLibrary
 
 data class TranscodeUiState(
     val inputUri: Uri? = null,
@@ -35,11 +36,18 @@ data class TranscodeUiState(
     val mediaInfo: String = "",
     val durationSec: Double = 0.0,
     /**
-     * Отмеченные на «Вводе» ролики в порядке нажатий. Первый — тот, который
-     * идёт на сравнение качества; остальные импортируются сразу с выбранным
-     * уровнем (минуя сравнение).
+     * Отмеченные на «Вводе» ролики в порядке нажатий. Отметка значит одно:
+     * «взять в обработку». Ролика для сравнения здесь нет — его выбирают отдельно
+     * на «Правке», кнопкой «Сравнить 3 уровня».
      */
     val selection: List<SelectedInput> = emptyList(),
+
+    /** Ролик, открытый на просмотр прямо из карточки отбора. Не обязательно отмечен. */
+    val inspectUri: Uri? = null,
+    val inspectName: String = "",
+    val inspectInfo: String = "",
+    val inspectLoading: Boolean = false,
+
     val preset: TranscodePreset = TranscodePreset(),
     val previews: List<PreviewResult> = emptyList(),
     /**
@@ -72,7 +80,14 @@ data class TranscodeUiState(
     /** Имена энкодеров из `-encoders`. Пусто = ещё не детектили. */
     val availableEncoders: Set<String> = emptySet(),
     val encodersDetected: Boolean = false,
-)
+) {
+    /**
+     * Суммарный размер отмеченных роликов. Карточка отбора показывает его
+     * одной строкой, поэтому он считается здесь, а не копируется в состояние:
+     * иначе пришлось бы обновлять его в каждом месте, где меняется отметка.
+     */
+    val selectedBytes: Long get() = selection.sumOf { it.sizeBytes }
+}
 
 class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
     private val _ui = MutableStateFlow(TranscodeUiState())
@@ -129,7 +144,18 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
             TranscodeQueue.logs.collect { l -> _ui.update { it.copy(logs = l) } }
         }
         viewModelScope.launch {
-            TranscodeQueue.done.collect { d -> _ui.update { it.copy(done = d) } }
+            TranscodeQueue.done.collect { d ->
+                _ui.update { state ->
+                    val finished = d.map { it.inputUri }.toSet()
+                    state.copy(
+                        done = d,
+                        // Отметка снимается после успешного кодирования: держать
+                        // «взять в обработку» у уже обработанного ролика бессмысленно,
+                        // а снять её вручную пользователь забывает.
+                        selection = state.selection.filterNot { it.uri in finished },
+                    )
+                }
+            }
         }
         viewModelScope.launch {
             EncoderCatalog.state.collect { s ->
@@ -185,41 +211,94 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Отметка ролика в галерее. Первый отмеченный становится входом сравнения;
-     * если отметку сняли с него — входом становится следующий по порядку.
+     * Отметка ролика в галерее. Ничего больше она не трогает: вход сравнения
+     * выбирается отдельно, на «Правке», иначе снятие галочки с первого ролика
+     * молча подменяло бы файл, который пользователь уже сравнивает.
      */
-    fun toggleSelection(uri: Uri, name: String) {
-        val state = _ui.value
+    fun toggleSelection(uri: Uri, name: String, sizeBytes: Long) {
         val key = uri.toString()
-        val current = state.selection
-        val next = if (current.any { it.uri.toString() == key }) {
-            current.filterNot { it.uri.toString() == key }
-        } else {
-            current + SelectedInput(uri, name)
-        }
-        _ui.update { it.copy(selection = next) }
-        val primary = next.firstOrNull()
-        // Метаданные и превью относятся к текущему «первому», а не ко всей
-        // отметке, поэтому перечитываем их только при смене входа.
-        if (primary?.uri != state.inputUri) {
-            if (primary == null) clearInput() else applyInput(primary.uri, primary.name)
+        _ui.update { state ->
+            val next = if (state.selection.any { it.uri.toString() == key }) {
+                state.selection.filterNot { it.uri.toString() == key }
+            } else {
+                state.selection + SelectedInput(uri, name, sizeBytes)
+            }
+            state.copy(selection = next)
         }
     }
 
-    /** Импорт нескольких файлов из ручного пикера: первым идёт в сравнение. */
+    /**
+     * Файлы из ручного пикера. Размер каждого доказывается отдельным запросом:
+     * из галереи тут нечего взять, а карточке отбора нужна сумма.
+     */
     fun addToSelection(items: List<Pair<Uri, String>>) {
-        items.forEach { (uri, name) ->
-            if (_ui.value.selection.none { it.uri == uri }) {
-                _ui.update { it.copy(selection = it.selection + SelectedInput(uri, name)) }
+        if (items.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            items.forEach { (uri, name) ->
+                if (_ui.value.selection.any { it.uri == uri }) return@forEach
+                val size = VideoLibrary.size(getApplication(), uri)
+                _ui.update { it.copy(selection = it.selection + SelectedInput(uri, name, size)) }
             }
         }
-        val primary = _ui.value.selection.firstOrNull()
-        if (primary != null && primary.uri != _ui.value.inputUri) applyInput(primary.uri, primary.name)
     }
 
+    /** Сброс отметок. Вход сравнения не трогаем — он выбран на «Правке». */
     fun clearSelection() {
         _ui.update { it.copy(selection = emptyList()) }
-        clearInput()
+    }
+
+    /** Ролик, открытый на просмотр из карточки отбора: снимаем, если он уже не тот. */
+    fun closeInspect() {
+        _ui.update { it.copy(inspectUri = null, inspectName = "", inspectInfo = "", inspectLoading = false) }
+    }
+
+    /**
+     * Просмотр ролика прямо из карточки: метаданные читаются тем же ffprobe,
+     * что и для входа сравнения, но в отдельное состояние — иначе открытый
+     * для просмотра ролик подменял бы файл на «Правке».
+     */
+    fun inspect(uri: Uri, name: String) {
+        if (_ui.value.inspectUri == uri) return
+        _ui.update {
+            it.copy(inspectUri = uri, inspectName = name, inspectInfo = str(R.string.input_reading), inspectLoading = true)
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val text = runCatching {
+                val ctx = getApplication<Application>()
+                val saf = FFmpegKitConfig.getSafParameterForRead(ctx, uri, false)
+                // Освобождаем URL только после чтения. unregisterSafProtocolUrl
+                // убирает запись из карты ffmpeg-kit, и следующий же open() не
+                // находит id — «Failed to open SAF id N: callback returned 0».
+                // Регистрация копится, но чистится здесь же, на каждый просмотр.
+                val session = try {
+                    FFprobeKit.getMediaInformation(saf)
+                } finally {
+                    runCatching { FFmpegKitConfig.unregisterSafProtocolUrl(saf) }
+                }
+                val info = session.getMediaInformation()
+                if (info == null) {
+                    str(R.string.meta_no_media_information) + "\n" +
+                        lastLogLines(ctx, session.getOutput(), 5)
+                } else {
+                    buildString {
+                        append(str(R.string.meta_format, info.getFormat(), info.getLongFormat()))
+                        append("\n")
+                        append(
+                            str(
+                                R.string.meta_duration,
+                                formatSec(info.getDuration()?.toDoubleOrNull() ?: 0.0, TranscodeFormat.currentLocale(ctx)),
+                                formatBytes(ctx, info.getSize()?.toLongOrNull() ?: 0L),
+                            ),
+                        )
+                        append("\n")
+                        append(str(R.string.meta_bitrate, info.getBitrate() ?: "?"))
+                        append("\n")
+                        append(prettyStreams(info))
+                    }
+                }
+            }.getOrElse { e -> str(R.string.meta_read_error, e.javaClass.name + ": " + e.message) }
+            _ui.update { it.copy(inspectInfo = text, inspectLoading = false) }
+        }
     }
 
     private fun clearInput() {
@@ -234,15 +313,11 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Вход для сравнения трёх уровней. Выбирается на «Правке» из отмеченного,
+     * поэтому сам по себе в отметку не попадает и порядок отметок не трогает.
+     */
     fun setInput(uri: Uri, name: String) {
-        // Одиночный выбор тоже должен попадать в отметку, иначе «первый файл»
-        // разъедется с входом сравнения. Поднимаем ролик на первое место.
-        val current = _ui.value.selection
-        _ui.update {
-            it.copy(
-                selection = listOf(SelectedInput(uri, name)) + current.filter { s -> s.uri != uri },
-            )
-        }
         applyInput(uri, name)
     }
 
@@ -264,6 +339,12 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                 val ctx = getApplication<Application>()
                 val saf = FFmpegKitConfig.getSafParameterForRead(ctx, uri, true)
                 inputSafUrl = saf
+                // Сравнение, запрошенное только что сменой входа, стартует
+                // здесь: SAF-URL уже есть, а раньше его не было ни у кого.
+                if (comparePending) {
+                    comparePending = false
+                    runCompare()
+                }
                 val session = FFprobeKit.getMediaInformation(saf)
                 val info = session.getMediaInformation()
                 if (info == null) {
@@ -313,11 +394,37 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                     ),
                 )
             } catch (e: Exception) {
-                _ui.update { it.copy(mediaInfo = str(R.string.meta_read_error, e.message)) }
-                appendLog(str(R.string.log_ffprobe_failed, e.message))
+                comparePending = false
+                // Сообщение самого исключения у Android почти бесполезно: на
+                // реальном файле прилетало «d != java.lang.String» — ни класса,
+                // ни стека, и понять, чей это каст, было нечем. Поэтому в
+                // подпись и в лог идёт класс исключения, а в лог — ещё и
+                // верхушка стектрейса.
+                val what = e.javaClass.name + ": " + e.message
+                _ui.update { it.copy(mediaInfo = str(R.string.meta_read_error, what)) }
+                appendLog(str(R.string.log_ffprobe_failed, what))
+                appendLog(
+                    e.stackTrace.take(12).joinToString("\n") { "\tat $it" }
+                        .ifEmpty { str(R.string.log_empty) },
+                )
             }
         }
     }
+
+    /**
+     * Ролик, выбранный на «Правке» для сравнения трёх уровней.
+     *
+     * Сравнение запускается не сразу: вход меняется здесь же, а ffprobe-шаг
+     * [applyInput] ещё должен выдать SAF-URL. Поэтому просьба ставится флагом и
+     * обрабатывается в конце applyInput — иначе сравнение стартовало бы с
+     * пустым входом и молча уходило бы в лог.
+     */
+    fun pickForCompare(uri: Uri, name: String) {
+        comparePending = true
+        applyInput(uri, name)
+    }
+
+    private var comparePending = false
 
     fun setEngine(engine: TranscodeEngine) {
         _ui.update { it.copy(preset = it.preset.copy(engine = engine), previews = emptyList()) }
@@ -419,29 +526,19 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
         appendLog(str(R.string.log_compare_cancel_requested))
     }
 
-    fun enqueueSelected() {
+    /**
+     * В очередь уходят все отмеченные на «Вводе» — без исключений: отдельной
+     * кнопки «Импорт» больше нет, отметка снимается сама после успешного
+     * кодирования (см. зеркало [TranscodeQueue.done] в `init`).
+     */
+    fun enqueueChecked() {
         val state = _ui.value
-        val uri = state.inputUri ?: run {
+        if (state.selection.isEmpty()) {
             appendLog(str(R.string.log_queue_nothing))
             return
         }
-        addJob(uri, state.inputName, state.preset)
-    }
-
-    /**
-     * Импорт пачки: в очередь уходят все отмеченные, кроме первого — он
-     * остаётся на «Правке» под сравнение трёх уровней. Сравнение нужно
-     * одному файлу: гонять его для каждого ролика — это минуты впустую.
-     */
-    fun importRest() {
-        val state = _ui.value
-        val rest = state.selection.drop(1)
-        if (rest.isEmpty()) {
-            appendLog(str(R.string.log_import_too_few))
-            return
-        }
         var added = 0
-        rest.forEach { picked ->
+        state.selection.forEach { picked ->
             if (addJob(picked.uri, picked.name, state.preset)) added++
         }
         appendLog(
@@ -449,16 +546,14 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                 R.plurals.log_import_done,
                 added,
                 added,
-                state.selection.size - 1,
-                // Имя первого ролика: в этот момент он точно есть (rest не пуст).
-                state.inputName.ifEmpty { str(R.string.input_none_selected) },
+                state.selection.size,
             ),
         )
     }
 
     /**
-     * Добавляет задание. false, если такой ролик уже ждёт в очереди: повторный
-     * тап «Импорт» иначе набивал бы очередь копиями одного и того же файла.
+     * Добавляет задание. false, если такой ролик уже ждёт в очереди: повторное
+     * нажатие «В очередь» иначе набивал бы очередь копиями одного и того же файла.
      */
     private fun addJob(uri: Uri, name: String, preset: TranscodePreset): Boolean {
         val pending = TranscodeQueue.queue.value
@@ -604,7 +699,11 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                     s.getHeight(),
                     s.getAverageFrameRate(),
                 )
-                "audio" -> str(R.string.stream_audio, s.getCodec(), s.getSampleRate())
+                // Частота дискретизации у ffmpeg-kit приходит строкой (в отличие
+                // от ширины и высоты — это Long), поэтому в строке ресурсов стоит
+                // %s, а не %d. Раньше здесь было %d, и любой ролик со звуком
+                // падал с IllegalFormatConversionException.
+                "audio" -> str(R.string.stream_audio, s.getCodec(), s.getSampleRate() ?: "?")
                 else -> str(R.string.stream_other, s.getType(), s.getCodec())
             }
         }.orEmpty()

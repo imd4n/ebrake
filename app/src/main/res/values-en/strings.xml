@@ -22,23 +22,29 @@
     <string name="action_diagnostics">Diagnostics</string>
     <string name="action_allow">Allow</string>
     <string name="action_pick_manually">Pick manually</string>
+    <string name="action_close">Close</string>
+    <string name="action_back">Back</string>
+    <string name="action_clear_selection">Clear selection</string>
+    <string name="action_compare_this">Compare this clip</string>
+    <string name="action_inspect">Technical details</string>
 
     <string name="input_source">Source: %1$s</string>
     <string name="input_compare">Comparing: %1$s</string>
     <string name="input_none_selected">No file selected</string>
     <string name="input_pick_hint">Pick a video on the Input screen</string>
     <string name="input_reading">Reading metadata…</string>
-    <string name="input_selection_first">1 — “%1$s” for comparison</string>
-    <string name="input_selected_single">Selected: %1$d</string>
 
-    <plurals name="input_selection_count">
-        <item quantity="one">Selected: %1$d · to queue: %2$d</item>
-        <item quantity="other">Selected: %1$d · to queue: %2$d</item>
-    </plurals>
+    <!-- Карточка отбора над доком и её полноэкранный слой. -->
+    <string name="input_grid_mode">Grid layout</string>
+    <string name="input_grid_dense">Even grid, 4 across</string>
+    <string name="input_grid_dated">Grouped by date</string>
+    <string name="selected_title">Selected clips</string>
+    <string name="selected_total_size">total size %1$s</string>
+    <string name="selected_size_unknown">total size unknown</string>
 
-    <plurals name="action_import">
-        <item quantity="one">Import: %1$d</item>
-        <item quantity="other">Import: %1$d</item>
+    <plurals name="selected_count">
+        <item quantity="one">%1$d clip selected</item>
+        <item quantity="other">%1$d clips selected</item>
     </plurals>
 
     <string name="edit_intro">Engine and a three-level comparison on a 10-second clip from the middle of the file.</string>
@@ -46,10 +52,12 @@
     <string name="edit_engine_fallback">An unavailable engine is replaced automatically during comparison.</string>
     <string name="edit_compare">Compare 3 levels</string>
     <string name="edit_compare_title">Quality comparison</string>
-    <string name="edit_compare_hint">Run “Compare 3 levels” — previews will appear here.</string>
+    <string name="edit_compare_hint">Run “Compare 3 levels” — pick a clip from those marked on the Input screen.</string>
+    <string name="edit_compare_needs_selection">Mark at least one clip on the Input screen first.</string>
     <string name="edit_compare_meta">%1$s · %2$s · %3$d-second preview</string>
     <string name="edit_preview_placeholder">The preview will appear here after the comparison.</string>
-    <string name="edit_take_to_queue">Add “%1$s” to queue</string>
+    <string name="edit_take_to_queue">Add %1$s to queue</string>
+    <string name="edit_queue_empty">Nothing is marked on the Input screen — there is nothing to queue.</string>
     <string name="level_label">Level: %1$s</string>
     <string name="engine_not_in_build">not in build</string>
     <string name="cd_preview_fullscreen">Open preview fullscreen</string>
@@ -75,7 +83,7 @@
 
     <string name="output_to">Output to: %1$s</string>
     <string name="queue_running_suffix"> · encoding…</string>
-    <string name="queue_empty">Queue is empty. Mark clips on the Input screen and tap “Import”, or “Add to queue” on the Edit screen.</string>
+    <string name="queue_empty">Queue is empty. Mark clips on the Input screen and add them with “Add to queue”.</string>
     <string name="done_saved">Saved %1$s out of %2$s</string>
     <string name="done_saved_percent">Saved %1$s out of %2$s (%3$d%%)</string>
     <string name="done_no_savings">no savings</string>
@@ -109,7 +117,7 @@
     <string name="meta_read_error">Read error: %1$s</string>
     <string name="meta_no_media_information">FFprobe could not read the file.</string>
     <string name="stream_video">video: %1$s %2$dx%3$d %4$s fps</string>
-    <string name="stream_audio">audio: %1$s %2$d Hz</string>
+    <string name="stream_audio">audio: %1$s %2$s Hz</string>
     <string name="stream_other">%1$s: %2$s</string>
 
     <string name="date_today">Today</string>
@@ -150,15 +158,14 @@
     <string name="log_compare_done">Comparison done: pick a level with the control below the card.</string>
     <string name="log_compare_cancelled">Comparison cancelled.</string>
     <string name="log_compare_cancel_requested">Comparison: cancelling…</string>
-    <string name="log_queue_nothing">Queue: nothing to add — pick a file.</string>
+    <string name="log_queue_nothing">Queue: nothing to add — mark clips on the Input screen.</string>
     <string name="log_queue_cancel_requested">Queue: cancelling…</string>
     <string name="log_queue_finished">Queue: finished.</string>
     <string name="log_job_starting">Job %1$d: %2$s — encoding…</string>
     <string name="log_input_open_failed">Job %1$d: could not open input: %2$s</string>
-    <string name="log_import_too_few">Import: mark at least two clips — the first one goes to comparison.</string>
     <plurals name="log_import_done">
-        <item quantity="one">Import: %1$d of %2$d added to queue. Comparing “%3$s”.</item>
-        <item quantity="other">Import: %1$d of %2$d added to queue. Comparing “%3$s”.</item>
+        <item quantity="one">Queue: %1$d of %2$d added.</item>
+        <item quantity="other">Queue: %1$d of %2$d added.</item>
     </plurals>
     <string name="log_already_queued">Already queued: %1$s — skipped.</string>
     <string name="log_enqueued">Added to queue: %1$s [%2$s]</string>

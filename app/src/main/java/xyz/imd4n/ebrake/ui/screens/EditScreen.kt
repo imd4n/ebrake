@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +26,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -37,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,10 +50,12 @@ import xyz.imd4n.ebrake.transcode.TranscodeFormat
 import xyz.imd4n.ebrake.transcode.TranscodeFormat.formatBytes
 import xyz.imd4n.ebrake.transcode.TranscodeUiState
 import xyz.imd4n.ebrake.transcode.TranscodeViewModel
+import xyz.imd4n.ebrake.ui.DockMetrics
 import xyz.imd4n.ebrake.ui.FullscreenQualityPreview
 import xyz.imd4n.ebrake.ui.PreviewPlayerHolder
 import xyz.imd4n.ebrake.ui.PreviewPlayerSurface
 import xyz.imd4n.ebrake.ui.QualityLevelSlider
+import xyz.imd4n.ebrake.ui.gallery.SelectedVideosSheet
 
 @Composable
 fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
@@ -71,6 +76,9 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
     val currentPath = selectedPreview?.outputPath.orEmpty()
 
     var fullscreen by remember { mutableStateOf(false) }
+    // Ролик для сравнения выбирается из отмеченных на «Вводе»: тот же слой,
+    // что и на «Вводе», только тап отправляет ролик на три уровня.
+    var pickerOpen by remember { mutableStateOf(false) }
     // runId в ключе: после нового «Сравнить» путь тот же, а файл перезаписан.
     LaunchedEffect(currentPath, state.compareRunId) {
         player.load(currentPath, state.compareRunId)
@@ -88,7 +96,10 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        // Отступ снизу — высота дока: док рисуется поверх содержимого, и без
+        // этого последняя кнопка уезжала бы под пилюлю намертво.
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = DockMetrics.ContentBottom),
+        modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
@@ -127,8 +138,11 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
                 // Пока кодирует очередь, движок занят: FFmpegKit.cancel() из
                 // очереди погасил бы и сравнение, поэтому кнопку блокируем.
                 Button(
-                    onClick = { vm.runCompare() },
-                    enabled = !state.compareRunning && !state.queueRunning,
+                    onClick = { pickerOpen = true },
+                    enabled = !state.compareRunning &&
+                        !state.queueRunning &&
+                        state.selection.isNotEmpty(),
+                    modifier = Modifier.weight(1f),
                 ) {
                     Text(stringResource(R.string.edit_compare))
                 }
@@ -137,6 +151,13 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
                         Text(stringResource(R.string.action_stop))
                     }
                 }
+            }
+            if (state.selection.isEmpty() && !state.compareRunning) {
+                Text(
+                    stringResource(R.string.edit_compare_needs_selection),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             if (state.compareRunning) {
                 LinearProgressIndicator(progress = { state.compareProgress01 }, modifier = Modifier.fillMaxWidth())
@@ -204,20 +225,45 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
                         onSelect = vm::setCompareLevel,
                         enabled = currentPath.isNotEmpty(),
                     )
-                    OutlinedButton(
-                        onClick = {
-                            selected?.let { vm.setCompareLevel(it) }
-                            vm.enqueueSelected()
+                    // Что именно уйдёт в очередь — одной строкой над кнопкой:
+                    // держать это в подписи самой кнопки значит писать
+                    // «Взять в очередь: Выбрано 3 ролика».
+                    Text(
+                        text = if (state.selection.isEmpty()) {
+                            stringResource(R.string.edit_queue_empty)
+                        } else {
+                            pluralStringResource(
+                                R.plurals.selected_count,
+                                state.selection.size,
+                                state.selection.size,
+                            ) + " · " + if (state.selectedBytes > 0) {
+                                stringResource(
+                                    R.string.selected_total_size,
+                                    formatBytes(context, state.selectedBytes),
+                                )
+                            } else {
+                                stringResource(R.string.selected_size_unknown)
+                            }
                         },
-                        enabled = selected != null,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedButton(
+                        // В очередь уходит вся отметка с «Ввода» с текущим
+                        // уровнем слайдера, а не один ролик сравнения: кнопки
+                        // импорта на «Вводе» больше нет, и брать оттуда нечего.
+                        onClick = { vm.enqueueChecked() },
+                        enabled = state.selection.isNotEmpty() && !state.queueRunning,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(
-                            stringResource(
-                                R.string.edit_take_to_queue,
-                                selected?.let { stringResource(it.titleRes) } ?: "—",
-                            ),
-                        )
+                        Text(stringResource(R.string.action_enqueue))
+                    }
+                    TextButton(
+                        onClick = { vm.clearSelection() },
+                        enabled = state.selection.isNotEmpty(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.action_clear_selection))
                     }
                 }
             }
@@ -232,6 +278,28 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
             subtitle = subtitle,
             onLevelChange = vm::setCompareLevel,
             onDismiss = { fullscreen = false },
+        )
+    }
+
+    if (pickerOpen) {
+        SelectedVideosSheet(
+            selection = state.selection,
+            detail = state.selection.firstOrNull { it.uri == state.inspectUri },
+            detailInfo = state.inspectInfo,
+            detailLoading = state.inspectLoading,
+            onToggle = { picked -> vm.toggleSelection(picked.uri, picked.name, picked.sizeBytes) },
+            onOpenDetail = { picked -> vm.inspect(picked.uri, picked.name) },
+            onCloseDetail = vm::closeInspect,
+            onClearAll = vm::clearSelection,
+            onPick = { picked ->
+                pickerOpen = false
+                vm.closeInspect()
+                vm.pickForCompare(picked.uri, picked.name)
+            },
+            onDismiss = {
+                pickerOpen = false
+                vm.closeInspect()
+            },
         )
     }
 }

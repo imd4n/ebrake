@@ -8,52 +8,63 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import dev.chrisbanes.haze.HazeState
 import xyz.imd4n.ebrake.R
 import xyz.imd4n.ebrake.transcode.TranscodeUiState
 import xyz.imd4n.ebrake.transcode.TranscodeViewModel
+import xyz.imd4n.ebrake.ui.DockMetrics
+import xyz.imd4n.ebrake.ui.gallery.SelectedVideosSheet
+import xyz.imd4n.ebrake.ui.gallery.SelectionSummaryCard
 import xyz.imd4n.ebrake.ui.gallery.VideoGallery
 import xyz.imd4n.ebrake.ui.gallery.VideoItem
 
 /**
- * Ввод: галерея роликов с телефона (вместо одиночной кнопки пикера) + карточка
- * с метаданными файла, выбранного на сравнение.
+ * Ввод: сетка роликов во весь экран и плавающая карточка отбора над доком.
  *
- * Рядом с галереей остались два ручных пути — SAF-пикер (без разрешений, выручает
- * с файлами, которых нет в MediaStore) и выбор папки: тогда галерея показывает
+ * Отдельной кнопки «Импорт» больше нет. Отметка — это список «что взять в
+ * обработку»: ролики уходят на «Правку», снимаются сами после успешного
+ * кодирования или кнопкой «Сбросить отметки» в карточке. Ролик для сравнения
+ * трёх уровней выбирается отдельно, на «Правке».
+ *
+ * Рядом с сеткой остались два ручных пути — SAF-пикер (без разрешений, выручает
+ * с файлами, которых нет в MediaStore) и выбор папки: тогда сетка показывает
  * только её содержимое, например Downloads.
- *
- * Отметка мультивыборная: ролик №1 идёт на «Правку» под сравнение трёх уровней,
- * остальные кнопкой «Импорт» сразу в очередь с текущим уровнем качества.
  */
 @Composable
-fun InputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
+fun InputScreen(vm: TranscodeViewModel, state: TranscodeUiState, hazeState: HazeState? = null) {
     val context = LocalContext.current
 
     // MediaStore читается только с разрешением; на 13+ это READ_MEDIA_VIDEO,
@@ -97,135 +108,154 @@ fun InputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
         ActivityResultContracts.OpenDocumentTree(),
     ) { uri -> uri?.let { vm.setInputFolder(it) } }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = stringResource(R.string.tab_input),
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.weight(1f),
-            )
-            OutlinedButton(onClick = { folderPicker.launch(null) }) {
-                Text(stringResource(R.string.action_folder))
+    // Ровная сетка или с разбивкой по датам. rememberSaveable, а не remember:
+    // переключение вкладок не должно сбрасывать выбор вида.
+    var denseGrid by rememberSaveable { mutableStateOf(true) }
+    var gridMenuOpen by remember { mutableStateOf(false) }
+    var sheetOpen by remember { mutableStateOf(false) }
+
+    // Шапка плавает поверх сетки, а сетка начинается под ней — иначе верхний
+    // ряд плиток оказался бы под заголовком. Высоту меряем, а не задаём
+    // константой: строки переводятся и на других языках длиннее.
+    var headerSize by remember { mutableStateOf(IntSize.Zero) }
+    val headerHeight = with(LocalDensity.current) { headerSize.height.toDp() }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        VideoGallery(
+            selection = state.selection.map { it.uri.toString() },
+            treeUri = state.inputTreeUri,
+            hasPermission = hasPermission,
+            denseGrid = denseGrid,
+            onToggle = { item: VideoItem ->
+                vm.toggleSelection(item.uri, item.name, item.sizeBytes)
+            },
+            onRequestPermission = { permissionLauncher.launch(mediaPermission) },
+            onPickManually = { manualPicker.launch(arrayOf("video/*")) },
+            onShowAll = { vm.setInputFolder(null) },
+            modifier = Modifier.fillMaxSize(),
+            topInset = headerHeight,
+        )
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .onSizeChanged { headerSize = it },
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.tab_input),
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedButton(onClick = { folderPicker.launch(null) }) {
+                    Text(stringResource(R.string.action_folder))
+                }
+                Box {
+                    IconButton(onClick = { gridMenuOpen = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = stringResource(R.string.input_grid_mode),
+                        )
+                    }
+                    GridModeMenu(
+                        expanded = gridMenuOpen,
+                        dense = denseGrid,
+                        onSelect = { denseGrid = it },
+                        onDismiss = { gridMenuOpen = false },
+                    )
+                }
             }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = stringResource(R.string.input_source, state.inputFolderLabel),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            if (state.inputFolderChosen) {
-                // Вернуться ко всем роликам, не заставляя искать папку заново.
-                TextButton(onClick = { vm.setInputFolder(null) }) {
-                    Text(stringResource(R.string.action_all_videos))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 8.dp, bottom = 4.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.input_source, state.inputFolderLabel),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (state.inputFolderChosen) {
+                    // Вернуться ко всем роликам, не заставляя искать папку заново.
+                    TextButton(onClick = { vm.setInputFolder(null) }) {
+                        Text(stringResource(R.string.action_all_videos))
+                    }
                 }
             }
         }
-        Card(modifier = Modifier.weight(1f)) {
-            VideoGallery(
-                selection = state.selection.map { it.uri.toString() },
-                treeUri = state.inputTreeUri,
-                hasPermission = hasPermission,
-                onToggle = { item: VideoItem -> vm.toggleSelection(item.uri, item.name) },
-                onRequestPermission = { permissionLauncher.launch(mediaPermission) },
-                onPickManually = { manualPicker.launch(arrayOf("video/*")) },
-                onShowAll = { vm.setInputFolder(null) },
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        if (state.selection.isNotEmpty()) {
-            SelectionBar(
-                state = state,
-                onImport = { vm.importRest() },
-                onClear = { vm.clearSelection() },
-            )
-        }
-        if (state.inputUri != null) {
-            // Метаданные FFprobe многострочные, а галерее нужна высота:
-            // отдаём ему остаток, но не больше экрана.
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 80.dp)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                Text(
-                    text = stringResource(R.string.input_compare, state.inputName),
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = state.mediaInfo,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+
+        SelectionSummaryCard(
+            count = state.selection.size,
+            totalBytes = state.selectedBytes,
+            items = state.selection,
+            onOpen = { sheetOpen = true },
+            // Над пилюлей с полями по бокам: эксперимент с лентой в обрез
+            // экрана выглядел рваным — карточка уходила за край.
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = DockMetrics.ContentBottom)
+                .padding(horizontal = 16.dp),
+            hazeState = hazeState,
+        )
+    }
+
+    if (sheetOpen) {
+        SelectedVideosSheet(
+            selection = state.selection,
+            detail = state.selection.firstOrNull { it.uri == state.inspectUri },
+            detailInfo = state.inspectInfo,
+            detailLoading = state.inspectLoading,
+            onToggle = { picked -> vm.toggleSelection(picked.uri, picked.name, picked.sizeBytes) },
+            onOpenDetail = { picked -> vm.inspect(picked.uri, picked.name) },
+            onCloseDetail = vm::closeInspect,
+            onClearAll = vm::clearSelection,
+            // На «Вводе» тап по ролику только показывает его: сравнение
+            // выбирается на «Правке», иначе пришлось бы возвращаться туда
+            // за каждым следующим роликом.
+            onPick = null,
+            onDismiss = {
+                sheetOpen = false
+                vm.closeInspect()
+            },
+        )
     }
 }
 
-/**
- * Панель мультивыбора: показывает, сколько роликов отмечено и кто из них первый
- * (сравнение), и даёт одной кнопкой отправить остальные в очередь.
- *
- * Однослойная, а не карточка: экран и так втрое урезан галереей, а панель нужна
- * ровно тогда, когда что-то отмечено.
- */
+/** Меню шестерёнки: ровная сетка или сетка с разбивкой по датам. */
 @Composable
-private fun SelectionBar(
-    state: TranscodeUiState,
-    onImport: () -> Unit,
-    onClear: () -> Unit,
+private fun GridModeMenu(
+    expanded: Boolean,
+    dense: Boolean,
+    onSelect: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    val rest = state.selection.size - 1
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                // Один отмеченный — без «в очередь», там ноль. Берём не quantity
-                // `one` из плюрала (он сработает и для 21, 31…), а честное
-                // условие: часть «в очередь» видна, только когда она не ноль.
-                text = if (rest > 0) {
-                    pluralStringResource(
-                        R.plurals.input_selection_count,
-                        state.selection.size,
-                        state.selection.size,
-                        rest,
-                    )
-                } else {
-                    stringResource(R.string.input_selected_single, state.selection.size)
-                },
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = stringResource(
-                    R.string.input_selection_first,
-                    state.inputName.ifEmpty {
-                        stringResource(R.string.input_none_selected)
-                    },
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Button(onClick = onImport, enabled = rest > 0) {
-            Text(pluralStringResource(R.plurals.action_import, rest, rest))
-        }
-        TextButton(onClick = onClear) { Text(stringResource(R.string.action_reset)) }
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.input_grid_mode)) },
+            onClick = {},
+            enabled = false,
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.input_grid_dense)) },
+            leadingIcon = { RadioButton(selected = dense, onClick = null) },
+            onClick = { onSelect(true) },
+        )
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.input_grid_dated)) },
+            leadingIcon = { RadioButton(selected = !dense, onClick = null) },
+            onClick = { onSelect(false) },
+        )
     }
 }
 
