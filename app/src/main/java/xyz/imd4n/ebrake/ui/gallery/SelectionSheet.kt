@@ -1,16 +1,22 @@
 package xyz.imd4n.ebrake.ui.gallery
 
 import android.graphics.Bitmap
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -51,7 +57,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.chrisbanes.haze.HazeDefaults
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
@@ -65,7 +70,8 @@ import xyz.imd4n.ebrake.ui.PreviewPlayerSurface
 
 /**
  * Плавающая сводка отбора: «Выбрано N роликов · общий размер X МБ» и карусель
- * маленьких превью. Лежит над доком с полями по бокам.
+ * маленьких превью. Живёт в EbrakeApp рядом с доком: стеклу нужен сиблинг
+ * источника, а не потомок внутри пейджера. Ширина и стекло — те же, что у дока.
  *
  * Стекло — то же, что у дока: те же плотность фона, размытие, тень, бордер и
  * радиус из [DockMetrics]. Раньше у карточки были свои числа (0.80 / 16.dp /
@@ -147,11 +153,17 @@ fun SelectionSummaryCard(
 }
 
 /**
- * Полноэкранный слой отбора: крупные превью по три в ряд, галочка снимает
- * отметку, тап по самому превью открывает ролик с плеером и техдеталями.
+ * Слой отбора: крупные превью по три в ряд, галочка снимает отметку, тап по
+ * самому превью открывает ролик с плеером и техдеталями.
  *
- * Разделители и острые углы — те же, что у сетки на «Вводе»: одна визуальная
- * логика на обоих экранах, иначе переключение вкладок «щёлкает».
+ * Инлайн-оверлей, а не Dialog: haze живёт в пределах одного окна, в диалоге
+ * вместо блюра остался бы только тинт. Поэтому оба места (просмотр на «Вводе»
+ * и пикер на «Правке») хостятся в EbrakeApp поверх дока и делят этот компонент.
+ * Панель нижняя и не во весь экран (см. SHEET_FRACTION): сверху остаётся
+ * контекст, тап по скриму и системный «назад» закрывают окно.
+ *
+ * Разделители и острые углы плиток — те же, что у сетки на «Вводе»: одна
+ * визуальная логика на обоих экранах, иначе переключение вкладок «щёлкает».
  *
  * [onPick] не null только на «Правке»: там тап по ролику отправляет его на
  * сравнение трёх уровней. На «Вводе» тап только показывает ролик.
@@ -168,13 +180,54 @@ fun SelectedVideosSheet(
     onClearAll: () -> Unit,
     onPick: ((SelectedInput) -> Unit)?,
     onDismiss: () -> Unit,
+    /** Стекло дока; null = сплошная подложка (превью, тесты). */
+    hazeState: HazeState? = null,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
+    // Dialog сам гасил «назад», инлайну нужен явный хендлер.
+    BackHandler(onBack = onDismiss)
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Скри м: затемнение + тап мимо закрывает окно.
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
+                .background(Color.Black.copy(alpha = 0.45f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss,
+                ),
+        )
+        val shape = RoundedCornerShape(topStart = SHEET_TOP_RADIUS, topEnd = SHEET_TOP_RADIUS)
+        val glass = if (hazeState != null) {
+            Modifier.hazeEffect(
+                state = hazeState,
+                style = HazeDefaults.style(
+                    backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = DockMetrics.GlassAlpha),
+                    blurRadius = DockMetrics.BlurRadius,
+                ),
+            )
+        } else {
+            Modifier.background(MaterialTheme.colorScheme.surface)
+        }
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .fillMaxHeight(SHEET_FRACTION)
+                .shadow(DockMetrics.Shadow, shape, clip = false)
+                .clip(shape)
+                .then(glass)
+                // Тонкая светлая кромка — та же, что у дока и карточки.
+                .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
+                // Гасим тапы по самой панели: иначе долетят до скрима и
+                // закроют окно прямо под пальцем.
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                ),
         ) {
+            SheetHandle()
             SheetHeader(title = stringResource(R.string.selected_title))
             if (detail != null) {
                 VideoDetailPane(
@@ -188,13 +241,10 @@ fun SelectedVideosSheet(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(SHEET_COLUMNS),
                     // Вес, а не fillMaxSize: сетка должна отдать подвалу его
-                    // место, а не выдавить кнопки за нижний край экрана.
+                    // место, а не выдавить кнопки за нижний край панели.
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth()
-                        // Фон виден в зазорах — те же тонкие разделители, что
-                        // на сетке «Ввода».
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        .fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(GUTTER),
                     verticalArrangement = Arrangement.spacedBy(GUTTER),
                 ) {
@@ -230,12 +280,29 @@ fun SelectedVideosSheet(
     }
 }
 
+/** Ручка сверху: видно, что это нижний лист, а не полноэкранный слой. */
+@Composable
+private fun SheetHandle() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp, bottom = 2.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 36.dp, height = 4.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+        )
+    }
+}
+
 @Composable
 private fun SheetFooter(onClearAll: () -> Unit, onClose: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -253,13 +320,15 @@ private fun SheetHeader(title: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
+            // Лист висит вне Scaffold, и LocalContentColor здесь дефолтный
+            // чёрный — без явного цвета заголовок нечитаем на стекле.
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
     }
@@ -276,7 +345,6 @@ private fun SheetTile(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
             .clickable(onClick = onClick),
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -324,6 +392,7 @@ private fun SheetTile(
         Text(
             text = item.name,
             style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
@@ -336,7 +405,7 @@ private fun SheetTile(
  * ffprobe, что показываются для входа сравнения.
  */
 @Composable
-private fun VideoDetailPane(
+private fun ColumnScope.VideoDetailPane(
     item: SelectedInput,
     info: String,
     loading: Boolean,
@@ -353,44 +422,56 @@ private fun VideoDetailPane(
         onDispose { player.stopSource() }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Text(
-            text = item.name,
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (item.sizeBytes > 0) {
-            Text(
-                text = formatBytes(context, item.sizeBytes),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Box(
+    // Статистика сверху, плеер снизу: вертикальное видео раньше выдавливало
+    // техдетали за край панели. Теперь остаток уезжает в скролл, а кнопки
+    // закреплены внизу и всегда под рукой.
+    Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
+        Column(
             modifier = Modifier
+                .weight(1f)
                 .fillMaxWidth()
-                .aspectRatio(player.videoAspect)
-                .clip(RoundedCornerShape(SHEET_CORNER))
-                .background(Color.Black),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            PreviewPlayerSurface(holder = player, modifier = Modifier.fillMaxSize())
+            Text(
+                text = item.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (item.sizeBytes > 0) {
+                Text(
+                    text = formatBytes(context, item.sizeBytes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (loading) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+            if (info.isNotEmpty()) {
+                Text(
+                    text = info,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(player.videoAspect)
+                    .clip(RoundedCornerShape(SHEET_CORNER))
+                    .background(Color.Black),
+            ) {
+                PreviewPlayerSurface(holder = player, modifier = Modifier.fillMaxSize())
+            }
         }
-        if (loading) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        }
-        Text(
-            text = info,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+        ) {
             TextButton(onClick = onBack, modifier = Modifier.weight(1f)) {
                 Text(stringResource(R.string.action_back))
             }
@@ -488,8 +569,14 @@ private fun CheckMark(
     }
 }
 
-/** Плиток в ряду в полноэкранной карточке: три — крупнее, чем четыре. */
+/** Плиток в ряду в листе отбора: три — крупнее, чем четыре. */
 private const val SHEET_COLUMNS = 3
+
+/** Доля высоты экрана под окно отбора: сверху остаётся контекст. */
+private const val SHEET_FRACTION = 0.75f
+
+/** Верхние углы листа: читается как лист, а не как второй экран. */
+private val SHEET_TOP_RADIUS = 28.dp
 
 /** Превью в карусели сводки. */
 private val THUMB_SIZE = 48.dp

@@ -101,6 +101,31 @@ class EbrakeMathTest {
     }
 
     @Test
+    fun `битрейт всегда в мегабитах с сотыми`() {
+        // Тот самый ролик со скрина: 19976343 bps → 19,98 Мбит/с.
+        assertEquals(19.976343, TranscodeFormat.mbpsOrNull("19976343")!!, 1e-9)
+        assertEquals("19,98", TranscodeFormat.fixed(19.976343, ru))
+        assertEquals("19.98", TranscodeFormat.fixed(19.976343, en))
+        // Пусто и мусор — null, вызывающий покажет «?».
+        assertEquals(null, TranscodeFormat.mbpsOrNull(null))
+        assertEquals(null, TranscodeFormat.mbpsOrNull("N/A"))
+    }
+
+    @Test
+    fun `fps дробью превращается в число с сотыми`() {
+        // avg_frame_rate со скрина: 1818000/61007 ≈ 29,80.
+        assertEquals(29.8, TranscodeFormat.fpsOrNull("1818000/61007")!!, 0.005)
+        assertEquals("29,80", TranscodeFormat.fixed(29.79986, ru))
+        assertEquals("29.80", TranscodeFormat.fixed(29.79986, en))
+        // Голое число — знаменатель 1, нулевой знаменатель — тоже 1.
+        assertEquals(30.0, TranscodeFormat.fpsOrNull("30")!!, 1e-9)
+        assertEquals(0.0, TranscodeFormat.fpsOrNull("0/0")!!, 1e-9)
+        // Мусор и пусто — null, вызывающий покажет строку как есть.
+        assertEquals(null, TranscodeFormat.fpsOrNull(null))
+        assertEquals(null, TranscodeFormat.fpsOrNull("N/A"))
+    }
+
+    @Test
     fun `база 50 это старая таблица уровней`() {
         // Лестница 28.09.2026: H.264 = 8/3/1.2М, x264 CRF 20/26/32, mpeg4 q 2/4/8.
         assertEquals("8M", FfmpegCommands.qualityLabel(TranscodeEngine.HW_H264, CompareLevel.HIGH, 50))

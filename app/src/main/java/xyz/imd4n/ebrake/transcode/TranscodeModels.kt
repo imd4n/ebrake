@@ -397,6 +397,32 @@ object TranscodeFormat {
             String.format(locale, "%\u002e1f", value)
         }
 
+    /**
+     * Число с фиксированными знаками после запятой, разделитель — по локали.
+     * Для статистики ffprobe: битрейт в Мбит/с и fps всегда с сотыми.
+     */
+    fun fixed(value: Double, locale: Locale, decimals: Int = 2): String =
+        String.format(locale, "%.${decimals}f", value)
+
+    /**
+     * Битрейт ffprobe в Мбит/с: строка приходит в bps. null = ffprobe не отдал
+     * число (пусто или «N/A»), тогда вызывающий показывает «?».
+     */
+    fun mbpsOrNull(raw: String?): Double? = raw?.toDoubleOrNull()?.div(1_000_000.0)
+
+    /**
+     * fps из avg_frame_rate вида «1818000/61007». Голое «30» тоже ест
+     * (знаменатель 1), нулевой знаменатель считает единицей. null = мусор,
+     * тогда вызывающий показывает строку как есть.
+     */
+    fun fpsOrNull(raw: String?): Double? {
+        if (raw.isNullOrBlank()) return null
+        val parts = raw.split("/")
+        val num = parts.getOrNull(0)?.toDoubleOrNull() ?: return null
+        val den = parts.getOrNull(1)?.toDoubleOrNull()?.takeIf { it != 0.0 } ?: 1.0
+        return num / den
+    }
+
     /** Размер с единицей: [context] — источник перевода «МБ»/«MB». */
     fun formatBytes(context: Context, bytes: Long, locale: Locale = currentLocale(context)): String {
         val (value, unit) = sizeParts(bytes)

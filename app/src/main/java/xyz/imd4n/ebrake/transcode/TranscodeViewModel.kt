@@ -19,9 +19,12 @@ import kotlinx.coroutines.launch
 import java.io.File
 import xyz.imd4n.ebrake.R
 import xyz.imd4n.ebrake.transcode.TranscodeFormat.PREVIEW_SEC
+import xyz.imd4n.ebrake.transcode.TranscodeFormat.fixed
 import xyz.imd4n.ebrake.transcode.TranscodeFormat.formatBytes
 import xyz.imd4n.ebrake.transcode.TranscodeFormat.formatSec
+import xyz.imd4n.ebrake.transcode.TranscodeFormat.fpsOrNull
 import xyz.imd4n.ebrake.transcode.TranscodeFormat.lastLogLines
+import xyz.imd4n.ebrake.transcode.TranscodeFormat.mbpsOrNull
 import xyz.imd4n.ebrake.ui.gallery.VideoLibrary
 
 data class TranscodeUiState(
@@ -285,6 +288,7 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                     str(R.string.meta_no_media_information) + "\n" +
                         lastLogLines(ctx, session.getOutput(), 5)
                 } else {
+                    val locale = TranscodeFormat.currentLocale(ctx)
                     buildString {
                         append(str(R.string.meta_format, info.getFormat(), info.getLongFormat()))
                         append("\n")
@@ -296,9 +300,9 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                             ),
                         )
                         append("\n")
-                        append(str(R.string.meta_bitrate, info.getBitrate() ?: "?"))
+                        append(str(R.string.meta_bitrate, prettyBitrate(info.getBitrate(), locale)))
                         append("\n")
-                        append(prettyStreams(info))
+                        append(prettyStreams(info, locale))
                     }
                 }
             }.getOrElse { e -> str(R.string.meta_read_error, e.javaClass.name + ": " + e.message) }
@@ -363,8 +367,8 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                     return@launch
                 }
                 val dur = info.getDuration()?.toDoubleOrNull() ?: 0.0
-                val streams = prettyStreams(info)
                 val locale = TranscodeFormat.currentLocale(ctx)
+                val streams = prettyStreams(info, locale)
                 _ui.update {
                     it.copy(
                         durationSec = dur,
@@ -385,7 +389,7 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                                 ),
                             )
                             append("\n")
-                            append(str(R.string.meta_bitrate, info.getBitrate() ?: "?"))
+                            append(str(R.string.meta_bitrate, prettyBitrate(info.getBitrate(), locale)))
                             append("\n")
                             append(streams)
                         },
@@ -728,16 +732,27 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun engineAvailable(engine: TranscodeEngine): Boolean = EncoderCatalog.available(engine)
 
-    private fun prettyStreams(info: com.arthenica.ffmpegkit.MediaInformation): String =
+    /** Битрейт в Мбит/с с сотыми; неизвестно — «?», единицу дописывает строка ресурсов. */
+    private fun prettyBitrate(raw: String?, locale: java.util.Locale): String =
+        mbpsOrNull(raw)?.let { fixed(it, locale) } ?: "?"
+
+    private fun prettyStreams(info: com.arthenica.ffmpegkit.MediaInformation, locale: java.util.Locale): String =
         info.getStreams()?.joinToString("\n") { s ->
             when (s.getType()) {
-                "video" -> str(
-                    R.string.stream_video,
-                    s.getCodec(),
-                    s.getWidth(),
-                    s.getHeight(),
-                    s.getAverageFrameRate(),
-                )
+                "video" -> {
+                    // avg_frame_rate приходит дробью «1818000/61007» — человеку
+                    // нужно число с сотыми. Не разобрали — показываем как есть.
+                    val fps = fpsOrNull(s.getAverageFrameRate())
+                        ?.let { fixed(it, locale) }
+                        ?: s.getAverageFrameRate()
+                    str(
+                        R.string.stream_video,
+                        s.getCodec(),
+                        s.getWidth(),
+                        s.getHeight(),
+                        fps,
+                    )
+                }
                 // Частота дискретизации у ffmpeg-kit приходит строкой (в отличие
                 // от ширины и высоты — это Long), поэтому в строке ресурсов стоит
                 // %s, а не %d. Раньше здесь было %d, и любой ролик со звуком
