@@ -76,11 +76,14 @@ import xyz.imd4n.ebrake.ui.FullscreenQualityPreview
 import xyz.imd4n.ebrake.ui.PreviewPlayerHolder
 import xyz.imd4n.ebrake.ui.PreviewPlayerSurface
 import xyz.imd4n.ebrake.ui.QualityLevelSlider
-import xyz.imd4n.ebrake.ui.gallery.SelectedVideosSheet
 import kotlin.math.roundToInt
 
+/**
+ * Пикер ролика для сравнения живёт в EbrakeApp рядом с остальными слоями:
+ * стеклу нужен сиблинг источника. Сюда наружу только колбэк открытия.
+ */
 @Composable
-fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
+fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState, onOpenPicker: () -> Unit) {
     val context = LocalContext.current
 
     // Один плеер на весь экран сравнения: качество переключается подменой MediaItem
@@ -99,9 +102,6 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
 
     var fullscreen by remember { mutableStateOf(false) }
     var qualityInfoOpen by remember { mutableStateOf(false) }
-    // Ролик для сравнения выбирается из отмеченных на «Вводе»: тот же слой,
-    // что и на «Вводе», только тап отправляет ролик на три уровня.
-    var pickerOpen by remember { mutableStateOf(false) }
     // runId в ключе: после нового «Сравнить» путь тот же, а файл перезаписан.
     LaunchedEffect(currentPath, state.compareRunId) {
         player.load(currentPath, state.compareRunId)
@@ -196,7 +196,7 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
                 // Пока кодирует очередь, движок занят: FFmpegKit.cancel() из
                 // очереди погасил бы и сравнение, поэтому кнопку блокируем.
                 Button(
-                    onClick = { pickerOpen = true },
+                    onClick = onOpenPicker,
                     enabled = !state.compareRunning &&
                         !state.queueRunning &&
                         state.selection.isNotEmpty(),
@@ -349,28 +349,6 @@ fun EditScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
             },
             title = { Text(stringResource(R.string.edit_quality_about)) },
             text = { Text(stringResource(R.string.edit_quality_about_text)) },
-        )
-    }
-
-    if (pickerOpen) {
-        SelectedVideosSheet(
-            selection = state.selection,
-            detail = state.selection.firstOrNull { it.uri == state.inspectUri },
-            detailInfo = state.inspectInfo,
-            detailLoading = state.inspectLoading,
-            onToggle = { picked -> vm.toggleSelection(picked.uri, picked.name, picked.sizeBytes) },
-            onOpenDetail = { picked -> vm.inspect(picked.uri, picked.name) },
-            onCloseDetail = vm::closeInspect,
-            onClearAll = vm::clearSelection,
-            onPick = { picked ->
-                pickerOpen = false
-                vm.closeInspect()
-                vm.pickForCompare(picked.uri, picked.name)
-            },
-            onDismiss = {
-                pickerOpen = false
-                vm.closeInspect()
-            },
         )
     }
 }

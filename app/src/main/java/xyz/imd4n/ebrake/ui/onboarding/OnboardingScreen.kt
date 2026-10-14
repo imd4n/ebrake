@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -86,8 +88,12 @@ fun OnboardingScreen(vm: TranscodeViewModel, onDone: () -> Unit) {
         contentColor = MaterialTheme.colorScheme.onBackground,
     ) {
         Column(
+            // edge-to-edge: без инсетов заголовок уезжает под строку
+            // состояния, а «Далее» — под жест навигации.
             modifier = Modifier
                 .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
                 .padding(horizontal = 24.dp, vertical = 16.dp),
         ) {
             // Заголовки — Unbounded через MaterialTheme (см. Type.kt): здесь

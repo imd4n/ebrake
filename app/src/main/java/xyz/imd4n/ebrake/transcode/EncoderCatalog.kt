@@ -87,14 +87,18 @@ object EncoderCatalog {
     }
 
     /**
-     * Реально ли открывается кодек: один кадр 64x64 через сам энкодер.
-     * Отмена (пользователь жал «Стоп» в этот момент) — не приговор кодеку.
+     * Реально ли открывается кодек: один кадр через сам энкодер.
+     * Аргументы минимальные (-b:v без qp-лимитов): проба проверяет сам факт
+     * открытия, а не поддержку опций качества. Полная лестница (vbr +
+     * qp-лимиты) и кадр 64x64 давали ложные отказы на рабочих чипах: часть
+     * HEVC отвергает мелкие кадры и часть qp-опций, хотя реальный файл
+     * тем же энкодером кодирует. Отмена (пользователь жал «Стоп» в этот
+     * момент) — не приговор кодеку.
      */
     private fun opens(engine: TranscodeEngine): Boolean = runCatching {
         val session = FFmpegKit.execute(
-            "-f lavfi -i testsrc=size=64x64:rate=1:duration=0.2 " +
-                FfmpegCommands.videoArgs(TranscodePreset(engine = engine)) +
-                " -f null -y",
+            "-f lavfi -i testsrc=size=320x240:rate=1:duration=0.2 " +
+                "-c:v ${engine.ffmpegVideoCodec} -b:v 1M -f null -",
         )
         val rc = session.getReturnCode()
         ReturnCode.isSuccess(rc) || ReturnCode.isCancel(rc)

@@ -119,7 +119,7 @@
 
     <string name="meta_format">Format: %1$s (%2$s)</string>
     <string name="meta_duration">Duration: %1$s, size: %2$s</string>
-    <string name="meta_bitrate">Bitrate: %1$s bps</string>
+    <string name="meta_bitrate">Bitrate: %1$s Mbps</string>
     <string name="meta_read_error">Read error: %1$s</string>
     <string name="meta_no_media_information">FFprobe could not read the file.</string>
     <string name="stream_video">video: %1$s %2$dx%3$d %4$s fps</string>

@@ -150,7 +150,7 @@
     <!-- ══════════════ Метаданные файла ══════════════ -->
     <string name="meta_format">Формат: %1$s (%2$s)</string>
     <string name="meta_duration">Длительность: %1$s, размер: %2$s</string>
-    <string name="meta_bitrate">Битрейт: %1$s bps</string>
+    <string name="meta_bitrate">Битрейт: %1$s Мбит/с</string>
     <string name="meta_read_error">Ошибка чтения: %1$s</string>
     <string name="meta_no_media_information">FFprobe не смог прочитать файл.</string>
     <string name="stream_video">видео: %1$s %2$dx%3$d %4$s fps</string>

@@ -45,18 +45,17 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import dev.chrisbanes.haze.HazeState
 import xyz.imd4n.ebrake.R
 import xyz.imd4n.ebrake.transcode.TranscodeUiState
 import xyz.imd4n.ebrake.transcode.TranscodeViewModel
-import xyz.imd4n.ebrake.ui.DockMetrics
-import xyz.imd4n.ebrake.ui.gallery.SelectedVideosSheet
-import xyz.imd4n.ebrake.ui.gallery.SelectionSummaryCard
 import xyz.imd4n.ebrake.ui.gallery.VideoGallery
 import xyz.imd4n.ebrake.ui.gallery.VideoItem
 
 /**
- * Ввод: сетка роликов во весь экран и плавающая карточка отбора над доком.
+ * Ввод: сетка роликов во весь экран.
+ *
+ * Плавающая карточка отбора и её полноэкранный слой живут в EbrakeApp, рядом
+ * с доком: стеклу нужен сиблинг источника, а не потомок внутри пейджера.
  *
  * Отдельной кнопки «Импорт» больше нет. Отметка — это список «что взять в
  * обработку»: ролики уходят на «Правку», снимаются сами после успешного
@@ -68,7 +67,7 @@ import xyz.imd4n.ebrake.ui.gallery.VideoItem
  * только её содержимое, например Downloads.
  */
 @Composable
-fun InputScreen(vm: TranscodeViewModel, state: TranscodeUiState, hazeState: HazeState? = null) {
+fun InputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
     val context = LocalContext.current
 
     // MediaStore читается только с разрешением; на 13+ это READ_MEDIA_VIDEO,
@@ -129,7 +128,6 @@ fun InputScreen(vm: TranscodeViewModel, state: TranscodeUiState, hazeState: Haze
     // переключение вкладок не должно сбрасывать выбор вида.
     var denseGrid by rememberSaveable { mutableStateOf(true) }
     var gridMenuOpen by remember { mutableStateOf(false) }
-    var sheetOpen by remember { mutableStateOf(false) }
 
     // Шапка плавает поверх сетки, а сетка начинается под ней — иначе верхний
     // ряд плиток оказался бы под заголовком. Высоту меряем, а не задаём
@@ -211,41 +209,6 @@ fun InputScreen(vm: TranscodeViewModel, state: TranscodeUiState, hazeState: Haze
                 }
             }
         }
-
-        SelectionSummaryCard(
-            count = state.selection.size,
-            totalBytes = state.selectedBytes,
-            items = state.selection,
-            onOpen = { sheetOpen = true },
-            // Над пилюлей с полями по бокам: эксперимент с лентой в обрез
-            // экрана выглядел рваным — карточка уходила за край.
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = DockMetrics.ContentBottom)
-                .padding(horizontal = 16.dp),
-            hazeState = hazeState,
-        )
-    }
-
-    if (sheetOpen) {
-        SelectedVideosSheet(
-            selection = state.selection,
-            detail = state.selection.firstOrNull { it.uri == state.inspectUri },
-            detailInfo = state.inspectInfo,
-            detailLoading = state.inspectLoading,
-            onToggle = { picked -> vm.toggleSelection(picked.uri, picked.name, picked.sizeBytes) },
-            onOpenDetail = { picked -> vm.inspect(picked.uri, picked.name) },
-            onCloseDetail = vm::closeInspect,
-            onClearAll = vm::clearSelection,
-            // На «Вводе» тап по ролику только показывает его: сравнение
-            // выбирается на «Правке», иначе пришлось бы возвращаться туда
-            // за каждым следующим роликом.
-            onPick = null,
-            onDismiss = {
-                sheetOpen = false
-                vm.closeInspect()
-            },
-        )
     }
 }
 
