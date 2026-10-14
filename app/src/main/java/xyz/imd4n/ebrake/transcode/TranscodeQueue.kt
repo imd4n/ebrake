@@ -66,7 +66,7 @@ object TranscodeQueue {
 
     /** Задание закодировалось: переносим его в выполненные с экономией. */
     fun recordDone(record: DoneRecord) {
-        _done.update { (listOf(record) + it).takeLast(MAX_DONE) }
+        _done.update { (listOf(record) + it).take(MAX_DONE) }
     }
 
     fun clearDone() {

@@ -50,6 +50,10 @@
     <string name="edit_intro">Engine and a three-level comparison on a 10-second clip from the middle of the file.</string>
     <string name="edit_engine">Engine</string>
     <string name="edit_engine_fallback">An unavailable engine is replaced automatically during comparison.</string>
+    <string name="edit_quality">Quality</string>
+    <string name="edit_quality_hint">The slider is Balanced, High and Eco follow it.</string>
+    <string name="edit_quality_about">What the quality slider does</string>
+    <string name="edit_quality_about_text">The slider sets Balanced from 0 to 100. High and Eco are steps away from it: drag the Eco tick towards Balanced and High follows. The new position applies on the next “Compare 3 levels”; the middle (50) is this phone’s calibration.</string>
     <string name="edit_compare">Compare 3 levels</string>
     <string name="edit_compare_title">Quality comparison</string>
     <string name="edit_compare_hint">Run “Compare 3 levels” — pick a clip from those marked on the Input screen.</string>
@@ -67,6 +71,8 @@
     <string name="engine_hw_h264_hint">fast</string>
     <string name="engine_hw_hevc_title">HW H.265 (MediaCodec, compact)</string>
     <string name="engine_hw_hevc_hint">smaller</string>
+    <string name="engine_hw_av1_title">HW AV1 (MediaCodec, compact)</string>
+    <string name="engine_hw_av1_hint">smallest</string>
     <string name="engine_sw_x264_title">SW x264 (accurate CRF, slow)</string>
     <string name="engine_sw_x264_hint">accurate CRF</string>
     <string name="engine_sw_mpeg4_title">SW MPEG-4 (works everywhere)</string>
@@ -173,6 +179,7 @@
     <string name="log_clear_while_running">Clear: stop the queue first.</string>
     <string name="log_start_empty">Start: no jobs with status “Queued” in the queue.</string>
     <string name="log_engine_missing">Engine %1$s is not in this build → using %2$s.</string>
+    <string name="log_engine_hw_none">No hardware codec opened on this phone — software encoding will be used.</string>
     <string name="log_level_done">%1$s: done, %2$s</string>
     <string name="log_level_failed">%1$s: FAILED rc=%2$s</string>
     <string name="log_job_done">Job %1$d: done, %2$s (was %3$s, %4$s)\n%5$s</string>
@@ -190,6 +197,29 @@
     <string name="log_diagnostics_decoder_count">decoder lines: %1$d, mediacodec: %2$d</string>
     <string name="log_empty">(empty)</string>
 <string name="log_no_output">(no output)</string>
-<string name="log_output_fallback">Selected folder is unavailable — writing to the app folder.</string>
+<string name="log_output_fallback">Selected folder is unavailable — writing to the default folder.</string>
 <string name="log_engine_ready">eBrake ready. ffmpeg-kit-next engine linked.</string>
+
+    <string name="onboarding_flow_title">How eBrake works</string>
+    <string name="onboarding_flow_text">From input to finished clip in three steps.</string>
+    <string name="onboarding_step_input_text">Mark clips in the gallery or pick a folder — that is the processing queue.</string>
+    <string name="onboarding_step_edit_text">Pick an engine and level on a 10-second clip from the middle of the file.</string>
+    <string name="onboarding_step_output_text">Run the queue — finished clips land in Movies/eBrake.</string>
+    <string name="onboarding_folder_title">Where to save videos</string>
+    <string name="onboarding_folder_text">By default — the shared Movies/eBrake folder: visible in the gallery and file manager. You can pick your own.</string>
+    <string name="onboarding_folder_current">Now: %1$s</string>
+    <string name="onboarding_action_choose">Pick a folder</string>
+    <string name="onboarding_action_default">Keep Movies/eBrake</string>
+    <string name="onboarding_engines_title">Engines on this phone</string>
+    <string name="onboarding_engines_checking">Checking what this phone can do…</string>
+    <string name="onboarding_perm_title">Permissions</string>
+    <string name="onboarding_perm_text">So everything works without extra prompts later.</string>
+    <string name="onboarding_perm_media_title">Videos and files</string>
+    <string name="onboarding_perm_media_text">Gallery access to see your clips. Not needed if you pick a folder manually.</string>
+    <string name="onboarding_perm_notif_title">Notifications</string>
+    <string name="onboarding_perm_notif_text">Background encoding progress while the app is minimized.</string>
+    <string name="onboarding_perm_granted">Granted</string>
+    <string name="onboarding_perm_needed">Needs access</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_finish">Start</string>
 </resources>

@@ -26,6 +26,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,11 +37,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import dev.chrisbanes.haze.HazeState
 import xyz.imd4n.ebrake.R
 import xyz.imd4n.ebrake.transcode.TranscodeUiState
@@ -80,6 +84,19 @@ fun InputScreen(vm: TranscodeViewModel, state: TranscodeUiState, hazeState: Haze
             ContextCompat.checkSelfPermission(context, mediaPermission) ==
                 PackageManager.PERMISSION_GRANTED,
         )
+    }
+    // Возврат из системных настроек: перепроверяем, иначе экран так и покажет
+    // «нет доступа» после выданного разрешения.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val obs = LifecycleEventObserver { _, e ->
+            if (e == Lifecycle.Event.ON_RESUME) {
+                hasPermission = ContextCompat.checkSelfPermission(context, mediaPermission) ==
+                    PackageManager.PERMISSION_GRANTED
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),

@@ -132,6 +132,11 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
         // поэтому дубликат не появляется.
         TranscodeQueue.appendLog(str(R.string.log_engine_ready))
 
+        // Детект движков сразу при старте: экран онбординга показывает плашку
+        // «что умеет этот телефон», а меню на «Правке» — серые пункты.
+        // Однократный (см. EncoderCatalog.ensureDetected), поэтому дешёво.
+        refreshEncoders()
+
         // Зеркалим состояние очереди/лога/энкодеров в ui одним потоком,
         // чтобы экраны не знали про TranscodeQueue и EncoderCatalog.
         viewModelScope.launch {
@@ -339,12 +344,8 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                 val ctx = getApplication<Application>()
                 val saf = FFmpegKitConfig.getSafParameterForRead(ctx, uri, true)
                 inputSafUrl = saf
-                // Сравнение, запрошенное только что сменой входа, стартует
-                // здесь: SAF-URL уже есть, а раньше его не было ни у кого.
-                if (comparePending) {
-                    comparePending = false
-                    runCompare()
-                }
+                // Флаг не трогаем: сравнение стартует после ffprobe, когда
+                // durationSec уже свежий, иначе seek считался от нуля.
                 val session = FFprobeKit.getMediaInformation(saf)
                 val info = session.getMediaInformation()
                 if (info == null) {
@@ -355,6 +356,10 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                         )
                     }
                     appendLog(str(R.string.log_ffprobe_none))
+                    if (comparePending) {
+                        comparePending = false
+                        runCompare()
+                    }
                     return@launch
                 }
                 val dur = info.getDuration()?.toDoubleOrNull() ?: 0.0
@@ -393,6 +398,10 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
                         formatSec(dur, locale),
                     ),
                 )
+                if (comparePending) {
+                    comparePending = false
+                    runCompare()
+                }
             } catch (e: Exception) {
                 comparePending = false
                 // Сообщение самого исключения у Android почти бесполезно: на
@@ -415,9 +424,9 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
      * Ролик, выбранный на «Правке» для сравнения трёх уровней.
      *
      * Сравнение запускается не сразу: вход меняется здесь же, а ffprobe-шаг
-     * [applyInput] ещё должен выдать SAF-URL. Поэтому просьба ставится флагом и
-     * обрабатывается в конце applyInput — иначе сравнение стартовало бы с
-     * пустым входом и молча уходило бы в лог.
+     * [applyInput] ещё должен выдать SAF-URL и длительность для seek в середину.
+     * Поэтому просьба ставится флагом и обрабатывается в конце applyInput — иначе
+     * сравнение стартовало бы с пустым входом и молча уходило бы в лог.
      */
     fun pickForCompare(uri: Uri, name: String) {
         comparePending = true
@@ -433,6 +442,36 @@ class TranscodeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setCompareLevel(level: CompareLevel) {
         _ui.update { it.copy(preset = it.preset.copy(compareLevel = level)) }
+    }
+
+    /**
+     * База качества со слайдера (0..100). Превью сбрасываем, как при смене
+     * движка: старые файлы посчитаны другой базой. База не выходит за риски.
+     */
+    fun setQuality(quality: Int) {
+        val q = quality.coerceIn(FfmpegCommands.baseRange(_ui.value.preset.engine, _ui.value.preset.spread))
+        if (_ui.value.preset.quality == q) return
+        _ui.update { it.copy(preset = it.preset.copy(quality = q), previews = emptyList()) }
+    }
+
+    /** Разброс Эко/Высокого от базы (таскание рисок). Тоже сбрасывает превью. */
+    fun setSpread(spread: Float) {
+        val s = spread.coerceIn(0.2f, 2.5f)
+        val preset = _ui.value.preset
+        if (preset.spread == s) return
+        // Риски сдвинулись — база обязана остаться между ними.
+        val q = preset.quality.coerceIn(FfmpegCommands.baseRange(preset.engine, s))
+        _ui.update { it.copy(preset = preset.copy(spread = s, quality = q), previews = emptyList()) }
+    }
+
+    /**
+     * Детект энкодеров при открытии «Правки»: иначе меню не знает, что серить,
+     * пока не запустят сравнение или очередь. Однократный (см. ensureDetected).
+     */
+    fun refreshEncoders() {
+        viewModelScope.launch(Dispatchers.IO) {
+            EncoderCatalog.ensureDetected(getApplication())
+        }
     }
 
     /**

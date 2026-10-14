@@ -14,6 +14,12 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <!-- Вывод по умолчанию — публичная Movies/eBrake. До 28 включительно туда
+         пишется прямым File-путём, ему нужен WRITE. На 29+ пишем через
+         MediaStore (свои файлы — без разрешений), поэтому maxSdkVersion. -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <application
         android:allowBackup="true"

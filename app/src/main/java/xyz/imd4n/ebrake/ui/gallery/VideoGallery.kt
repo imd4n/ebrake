@@ -346,9 +346,10 @@ private fun CoverPrefetch(
             Triple(first, last, gridState.isScrollInProgress)
         }.collectLatest { (first, last, scrolling) ->
             if (scrolling) {
-                // Ждём отката назад: сетка встала — можно догонять.
+                // Дали сетке встать, но дальше грузим: иначе последний флинг
+                // уходил в return и предзагрузка не шла до следующего скролла.
                 delay(SETTLE_MS)
-                return@collectLatest
+                if (gridState.isScrollInProgress) return@collectLatest
             }
             val from = (first - PREFETCH_ROWS_BACK * GALLERY_COLUMNS).coerceAtLeast(0)
             val to = (last + PREFETCH_ROWS_AHEAD * GALLERY_COLUMNS).coerceAtMost(order.lastIndex)

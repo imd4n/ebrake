@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import androidx.annotation.StringRes
 import java.util.Locale
+import kotlin.math.pow
+import kotlin.math.roundToInt
 import xyz.imd4n.ebrake.R
 
 /**
@@ -30,6 +32,16 @@ enum class TranscodeEngine(
         R.string.engine_hw_hevc_title, "hevc_mediacodec",
         R.string.engine_hw_hevc_short, R.string.engine_hw_hevc_hint,
     ),
+    /**
+     * HW AV1 через тот же MediaCodec-враппер. Отдельной сборки не надо: если
+     * `av1_mediacodec` есть в `-encoders`, движок оживает сам, иначе висит
+     * «нет в сборке» и молча заменяется доступным. SW AV1 (libaom/svt) сюда
+     * не добавляем: его нет в AAR, а на телефоне он считал бы минутами.
+     */
+    HW_AV1(
+        R.string.engine_hw_av1_title, "av1_mediacodec",
+        R.string.engine_hw_av1_short, R.string.engine_hw_av1_hint,
+    ),
     SW_X264(
         R.string.engine_sw_x264_title, "libx264",
         R.string.engine_sw_x264_short, R.string.engine_sw_x264_hint,
@@ -55,6 +67,16 @@ enum class CompareLevel(@param:StringRes val titleRes: Int) {
 data class TranscodePreset(
     val engine: TranscodeEngine = TranscodeEngine.HW_H264,
     val compareLevel: CompareLevel = CompareLevel.BALANCED,
+    /**
+     * База качества 0..100, 50 = старая таблица. Крутит её слайдер на «Правке»:
+     * Баланс едет за слайдером, Высокое и Эко — фиксированные шаги от базы.
+     */
+    val quality: Int = 50,
+    /**
+     * Разброс уровней 1 = как было. Риски Эко/Высокого на слайдере таскаются:
+     * одна тянет вторую (общий множитель), 0.2 = почти рядом, 2.5 = широко.
+     */
+    val spread: Float = 1f,
 )
 
 /** Одно задание в очереди вывода. */
@@ -167,56 +189,98 @@ object FfmpegCommands {
         preset: TranscodePreset,
         seekSec: Int = 30,
         durationSec: Int = 10,
-    ): String = when (preset.engine) {
-        TranscodeEngine.HW_H264 -> {
-            val hw = hwQuality(preset.compareLevel)
-            "-ss $seekSec -t $durationSec -i $inputSafUrl " +
-                "-c:v h264_mediacodec ${hwArgs(hw)} " +
-                "-c:a aac -b:a 128k -y $outputPath"
-        }
-        TranscodeEngine.HW_HEVC -> {
-            val hw = hwQuality(preset.compareLevel)
-            "-ss $seekSec -t $durationSec -i $inputSafUrl " +
-                "-c:v hevc_mediacodec ${hwArgs(hw)} " +
-                "-c:a aac -b:a 128k -y $outputPath"
-        }
-        TranscodeEngine.SW_X264 -> {
-            val crf = swCrf(preset.compareLevel)
-            "-ss $seekSec -t $durationSec -i $inputSafUrl " +
-                "-c:v libx264 -crf $crf -preset ultrafast " +
-                "-c:a aac -b:a 128k -y $outputPath"
-        }
-        TranscodeEngine.SW_MPEG4 -> {
-            val q = mpeg4q(preset.compareLevel)
-            "-ss $seekSec -t $durationSec -i $inputSafUrl " +
-                "-c:v mpeg4 -q:v $q " +
-                "-c:a aac -b:a 128k -y $outputPath"
-        }
+    ): String {
+        val video = videoArgs(preset, ultrafast = true)
+        return "-ss $seekSec -t $durationSec -i $inputSafUrl $video " +
+            "-c:a aac -b:a 128k -y $outputPath"
     }
 
     fun fullArgs(
         inputSafUrl: String,
         outputSafUrl: String,
         preset: TranscodePreset,
-    ): String = when (preset.engine) {
-        TranscodeEngine.HW_H264 -> {
-            "-i $inputSafUrl -c:v h264_mediacodec ${hwArgs(hwQuality(preset.compareLevel))} " +
-                "-c:a aac -b:a 128k -y $outputSafUrl"
+    ): String {
+        val video = videoArgs(preset, ultrafast = false)
+        return "-i $inputSafUrl $video -c:a aac -b:a 128k -y $outputSafUrl"
+    }
+
+    /** Видео-аргументы под движок: HW идут одной веткой, разница лишь в имени кодека. */
+    fun videoArgs(preset: TranscodePreset, ultrafast: Boolean = false): String =
+        when (preset.engine) {
+        TranscodeEngine.HW_H264, TranscodeEngine.HW_HEVC, TranscodeEngine.HW_AV1 ->
+            "-c:v ${preset.engine.ffmpegVideoCodec} ${hwArgs(hwQuality(preset.compareLevel, preset.quality, preset.spread))}"
+        TranscodeEngine.SW_X264 ->
+            "-c:v libx264 -crf ${swCrf(preset.compareLevel, preset.quality, preset.spread)} " +
+                "-preset ${if (ultrafast) "ultrafast" else "veryfast"}"
+        TranscodeEngine.SW_MPEG4 ->
+            "-c:v mpeg4 -q:v ${mpeg4q(preset.compareLevel, preset.quality, preset.spread)}"
+    }
+
+    /**
+     * Короткая техподпись уровня для слайдера («8M», «CRF 26», «q4»).
+     * Чистая, без Context: единицы кодера не переводятся.
+     */
+    fun qualityLabel(engine: TranscodeEngine, level: CompareLevel, quality: Int, spread: Float = 1f): String =
+        when (engine) {
+            TranscodeEngine.HW_H264, TranscodeEngine.HW_HEVC, TranscodeEngine.HW_AV1 ->
+                hwQuality(level, quality, spread).bitrate
+            TranscodeEngine.SW_X264 ->
+                "CRF ${swCrf(level, quality, spread)}"
+            TranscodeEngine.SW_MPEG4 ->
+                "q${mpeg4q(level, quality, spread)}"
         }
-        TranscodeEngine.HW_HEVC -> {
-            "-i $inputSafUrl -c:v hevc_mediacodec ${hwArgs(hwQuality(preset.compareLevel))} " +
-                "-c:a aac -b:a 128k -y $outputSafUrl"
+
+    /**
+     * Сдвиг уровня от Баланса в пунктах слайдера: плюс — Высокое, минус — Эко.
+     * Обратная сторона лестницы выше: точка, где Баланс дал бы тот же битрейт.
+     * Нужно рискам на слайдере, чтобы было видно расстояние от базы.
+     */
+    fun levelOffset(engine: TranscodeEngine, level: CompareLevel, spread: Float = 1f): Int {
+        val s = spread.coerceIn(0.2f, 2.5f)
+        val base = when (engine) {
+            TranscodeEngine.HW_H264, TranscodeEngine.HW_HEVC, TranscodeEngine.HW_AV1 -> when (level) {
+                CompareLevel.HIGH -> 35 // 8/3 ≈ 2^1.4 → 1.4 × 25
+                CompareLevel.BALANCED -> 0
+                CompareLevel.ECO -> -33 // 0.4 ≈ 2^-1.3 → −1.3 × 25
+            }
+            TranscodeEngine.SW_X264 -> when (level) {
+                CompareLevel.HIGH -> 38 // 6 CRF / 0.16 на пункт
+                CompareLevel.BALANCED -> 0
+                CompareLevel.ECO -> -38
+            }
+            TranscodeEngine.SW_MPEG4 -> when (level) {
+                CompareLevel.HIGH -> 25 // 2 q / 0.08 на пункт
+                CompareLevel.BALANCED -> 0
+                CompareLevel.ECO -> -50 // 4 q / 0.08 на пункт
+            }
         }
-        TranscodeEngine.SW_X264 -> {
-            val crf = swCrf(preset.compareLevel)
-            "-i $inputSafUrl -c:v libx264 -crf $crf -preset veryfast " +
-                "-c:a aac -b:a 128k -y $outputSafUrl"
+        return (base * s).roundToInt()
+    }
+
+    /**
+     * Базу нельзя увести за риски: иначе «Баланс» выйдет хуже Эко или лучше
+     * Высокого и лестница потеряет смысл. Диапазон сам сжимается вместе с рисками.
+     */
+    fun baseRange(engine: TranscodeEngine, spread: Float): IntRange {
+        val low = levelOffset(engine, CompareLevel.ECO, spread)
+        val high = levelOffset(engine, CompareLevel.HIGH, spread)
+        return (50 + low).coerceAtLeast(0)..(50 + high).coerceAtMost(100)
+    }
+
+    /**
+     * Новый разброс после перетаскивания риски на deltaPt пунктов слайдера.
+     * Плюс — от базы, минус — к базе. Разброс общий: Эко тянут к базе —
+     * Высокое едет к базе тем же множителем, и наоборот.
+     */
+    fun dragSpread(engine: TranscodeEngine, level: CompareLevel, spread: Float, deltaPt: Float): Float {
+        val def = when (level) {
+            CompareLevel.HIGH -> levelOffset(engine, CompareLevel.HIGH).toFloat()
+            CompareLevel.ECO -> -levelOffset(engine, CompareLevel.ECO).toFloat()
+            CompareLevel.BALANCED -> return spread
         }
-        TranscodeEngine.SW_MPEG4 -> {
-            val q = mpeg4q(preset.compareLevel)
-            "-i $inputSafUrl -c:v mpeg4 -q:v $q " +
-                "-c:a aac -b:a 128k -y $outputSafUrl"
-        }
+        if (def <= 0f) return spread
+        val dist = def * spread.coerceIn(0.2f, 2.5f) + if (level == CompareLevel.HIGH) deltaPt else -deltaPt
+        return (dist / def).coerceIn(0.2f, 2.5f)
     }
 
     /**
@@ -229,13 +293,36 @@ object FfmpegCommands {
      *   и Эко (q32) дали одинаковый размер. Поэтому лестница задаётся через
      *   VBR-таргет -b:v/-maxrate (это НЕ фиксированный CBR — битрейт плавает
      *   по содержимому), а qp-границы остаются страховкой от развалов качества.
+     *
+     * База слайдера удваивается каждые 25 пунктов: 50 = старая таблица
+     * (8/3/1.2M), 75 = вдвое больше, 25 = вдвое меньше.
      */
     private data class HwQuality(val bitrate: String, val maxrate: String, val qMin: Int, val qMax: Int)
 
-    private fun hwQuality(level: CompareLevel): HwQuality = when (level) {
-        CompareLevel.HIGH -> HwQuality("8M", "12M", 18, 25)
-        CompareLevel.BALANCED -> HwQuality("3M", "4.5M", 22, 30)
-        CompareLevel.ECO -> HwQuality("1.2M", "1.8M", 26, 34)
+    private fun hwQuality(level: CompareLevel, quality: Int, spread: Float): HwQuality {
+        val q = quality.coerceIn(0, 100)
+        val s = spread.coerceIn(0.2f, 2.5f)
+        val baseM = 3.0 * 2.0.pow((q - 50) / 25.0)
+        // Отношение уровней в степени разброса: 1 = старая таблица (8/3/1.2M).
+        val ratio = when (level) {
+            CompareLevel.HIGH -> 8.0 / 3.0
+            CompareLevel.BALANCED -> 1.0
+            CompareLevel.ECO -> 1.2 / 3.0
+        }.pow(s.toDouble())
+        val m = (baseM * ratio).coerceIn(0.3, 24.0)
+        val maxM = (m * 1.5).coerceIn(0.3, 32.0)
+        val (qMin, qMax) = when (level) {
+            CompareLevel.HIGH -> 18 to 25
+            CompareLevel.BALANCED -> 22 to 30
+            CompareLevel.ECO -> 26 to 34
+        }
+        return HwQuality(fmtM(m), fmtM(maxM), qMin, qMax)
+    }
+
+    /** «8M», а не «8.0M»: дробь только ниже 10M. */
+    private fun fmtM(m: Double): String {
+        val r = (m * 10).roundToInt() / 10.0
+        return if (r >= 10) "${r.toInt()}M" else "${r}M".replace(".0M", "M")
     }
 
     private fun hwArgs(hw: HwQuality) =
@@ -243,17 +330,26 @@ object FfmpegCommands {
             "-bufsize ${hw.maxrate} -qmin ${hw.qMin} -qmax ${hw.qMax} " +
             "-qp_i_max ${hw.qMax} -qp_p_max ${hw.qMax}"
 
-    private fun swCrf(level: CompareLevel): Int = when (level) {
-        CompareLevel.HIGH -> 20
-        CompareLevel.BALANCED -> 26
-        CompareLevel.ECO -> 32
+    /** CRF x264: 50 = старая таблица (20/26/32), шаг ±6 между уровнями. */
+    private fun swCrf(level: CompareLevel, quality: Int, spread: Float): Int {
+        val base = (26 - (quality.coerceIn(0, 100) - 50) * 0.16).roundToInt().coerceIn(16, 36)
+        val step = (6 * spread.coerceIn(0.2f, 2.5f)).roundToInt()
+        return when (level) {
+            CompareLevel.HIGH -> base - step
+            CompareLevel.BALANCED -> base
+            CompareLevel.ECO -> base + step
+        }.coerceIn(10, 40)
     }
 
-    /** mpeg4 -q:v: меньше = лучше, шкала 1–31. */
-    private fun mpeg4q(level: CompareLevel): Int = when (level) {
-        CompareLevel.HIGH -> 2
-        CompareLevel.BALANCED -> 4
-        CompareLevel.ECO -> 8
+    /** mpeg4 -q:v: меньше = лучше, шкала 1–31. 50 = старая таблица (2/4/8). */
+    private fun mpeg4q(level: CompareLevel, quality: Int, spread: Float): Int {
+        val base = (4 + (50 - quality.coerceIn(0, 100)) * 0.08).roundToInt().coerceIn(2, 10)
+        val s = spread.coerceIn(0.2f, 2.5f)
+        return when (level) {
+            CompareLevel.HIGH -> base - (2 * s).roundToInt()
+            CompareLevel.BALANCED -> base
+            CompareLevel.ECO -> base + (4 * s).roundToInt()
+        }.coerceIn(1, 16)
     }
 }
 

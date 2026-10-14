@@ -73,8 +73,8 @@ fun FloatingDock(
         Modifier.hazeEffect(
             state = hazeState,
             style = HazeDefaults.style(
-                backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
-                blurRadius = DOCK_BLUR_RADIUS,
+                backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = DockMetrics.GlassAlpha),
+                blurRadius = DockMetrics.BlurRadius,
             ),
         )
     } else {
@@ -83,7 +83,7 @@ fun FloatingDock(
     Row(
         modifier = modifier
             // Тень рисуется по форме пилюли и создаёт «парение» над контентом.
-            .shadow(18.dp, shape, clip = false)
+            .shadow(DockMetrics.Shadow, shape, clip = false)
             .clip(shape)
             .then(glass)
             .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
@@ -174,7 +174,15 @@ object DockMetrics {
 
     /** Отступ снизу для контента: сама пилюля + воздух под ней. */
     val ContentBottom = Height + BottomMargin * 2
-}
 
-/** Радиус гауссова размытия под пилюлей. Больше — дороже на слабых чипах. */
-private val DOCK_BLUR_RADIUS = 22.dp
+    // Дальше — параметры стекла. Живут здесь, а не в доке, потому что ими
+    // пользуется и карточка отбора: одна линейка стекла на оба элемента.
+    /** Плотность подложки: ниже — прозрачнее. */
+    val GlassAlpha = 0.62f
+
+    /** Радиус размытия под пилюлей. Больше — дороже на слабых чипах. */
+    val BlurRadius = 22.dp
+
+    /** Тень: карточка и док должны «парить» с одинаковой высоты. */
+    val Shadow = 18.dp
+}

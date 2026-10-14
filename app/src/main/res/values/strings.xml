@@ -60,6 +60,10 @@
     <string name="edit_intro">Движок и сравнение трёх уровней на 10-секундном отрезке из середины файла.</string>
     <string name="edit_engine">Движок</string>
     <string name="edit_engine_fallback">При сравнении недоступный движок автоматически заменяется доступным.</string>
+    <string name="edit_quality">Качество</string>
+    <string name="edit_quality_hint">Слайдер — это Баланс, Высокое и Эко едут от него.</string>
+    <string name="edit_quality_about">Что делает слайдер качества</string>
+    <string name="edit_quality_about_text">Слайдер ставит Баланс от 0 до 100. Высокое и Эко считаются от него шагами: тянешь риску Эко к Балансу — Высокое подъезжает тоже. Новое положение работает после следующего «Сравнить 3 уровня», середина (50) — калибровка с этого телефона.</string>
     <string name="edit_compare">Сравнить 3 уровня</string>
     <string name="edit_compare_title">Сравнение качества</string>
     <string name="edit_compare_hint">Нажми «Сравнить 3 уровня» и выбери ролик из отмеченных на «Вводе».</string>
@@ -78,6 +82,8 @@
     <string name="engine_hw_h264_hint">быстро</string>
     <string name="engine_hw_hevc_title">HW H.265 (MediaCodec, компактно)</string>
     <string name="engine_hw_hevc_hint">компактнее</string>
+    <string name="engine_hw_av1_title">HW AV1 (MediaCodec, компактно)</string>
+    <string name="engine_hw_av1_hint">самый компактный</string>
     <string name="engine_sw_x264_title">SW x264 (точный CRF, медленно)</string>
     <string name="engine_sw_x264_hint">точный CRF</string>
     <string name="engine_sw_mpeg4_title">SW MPEG-4 (везде работает)</string>
@@ -86,6 +92,7 @@
     <!-- Короткие имена движков — это названия кодеров ffmpeg, не переводятся. -->
     <string name="engine_hw_h264_short" translatable="false">HW H.264</string>
     <string name="engine_hw_hevc_short" translatable="false">HW H.265</string>
+    <string name="engine_hw_av1_short" translatable="false">HW AV1</string>
     <string name="engine_sw_x264_short" translatable="false">SW x264</string>
     <string name="engine_sw_mpeg4_short" translatable="false">SW MPEG-4</string>
 
@@ -210,6 +217,7 @@
     <string name="log_clear_while_running">Очистка: сначала останови очередь.</string>
     <string name="log_start_empty">Старт: в очереди нет заданий со статусом «В очереди».</string>
     <string name="log_engine_missing">Движок %1$s отсутствует в сборке → использую %2$s.</string>
+    <string name="log_engine_hw_none">Ни один аппаратный кодек не открылся на этом телефоне — будет программный кодировщик.</string>
     <string name="log_level_done">%1$s: готово, %2$s</string>
     <string name="log_level_failed">%1$s: ОШИБКА rc=%2$s</string>
     <string name="log_job_done">Задание %1$d: готово, %2$s (было %3$s, %4$s)\n%5$s</string>
@@ -229,6 +237,30 @@
     <string name="log_diagnostics_decoder_count">декодеров строк: %1$d, mediacodec: %2$d</string>
     <string name="log_empty">(пусто)</string>
 <string name="log_no_output">(нет вывода)</string>
-<string name="log_output_fallback">Выбранная папка недоступна — пишу в папку приложения.</string>
+<string name="log_output_fallback">Выбранная папка недоступна — пишу в папку по умолчанию.</string>
 <string name="log_engine_ready">eBrake готов. Движок ffmpeg-kit-next подключён.</string>
+
+    <!-- ══════════════ Онбординг ══════════════ -->
+    <string name="onboarding_flow_title">Как работает eBrake</string>
+    <string name="onboarding_flow_text">От ввода до готового ролика — три шага.</string>
+    <string name="onboarding_step_input_text">Отметь ролики в галерее или выбери папку — это очередь на обработку.</string>
+    <string name="onboarding_step_edit_text">Подбери движок и уровень на 10-секундном отрезке из середины файла.</string>
+    <string name="onboarding_step_output_text">Запусти очередь — готовые ролики лягут в Movies/eBrake.</string>
+    <string name="onboarding_folder_title">Куда сохранять видео</string>
+    <string name="onboarding_folder_text">По умолчанию — общая папка Movies/eBrake: её видно в галерее и файловом менеджере. Можно выбрать свою.</string>
+    <string name="onboarding_folder_current">Сейчас: %1$s</string>
+    <string name="onboarding_action_choose">Выбрать папку</string>
+    <string name="onboarding_action_default">Оставить Movies/eBrake</string>
+    <string name="onboarding_engines_title">Движки этого телефона</string>
+    <string name="onboarding_engines_checking">Проверяем, что умеет этот телефон…</string>
+    <string name="onboarding_perm_title">Разрешения</string>
+    <string name="onboarding_perm_text">Чтобы всё работало без лишних вопросов позже.</string>
+    <string name="onboarding_perm_media_title">Видео и файлы</string>
+    <string name="onboarding_perm_media_text">Доступ к галерее, чтобы видеть ролики. Если выбрать папку вручную — не нужен.</string>
+    <string name="onboarding_perm_notif_title">Уведомления</string>
+    <string name="onboarding_perm_notif_text">Прогресс кодирования в фоне, когда приложение свёрнуто.</string>
+    <string name="onboarding_perm_granted">Разрешено</string>
+    <string name="onboarding_perm_needed">Нужно разрешить</string>
+    <string name="onboarding_next">Далее</string>
+    <string name="onboarding_finish">Начать</string>
 </resources>

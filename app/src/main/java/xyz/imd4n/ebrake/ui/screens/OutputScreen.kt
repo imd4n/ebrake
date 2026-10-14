@@ -60,7 +60,7 @@ fun OutputScreen(vm: TranscodeViewModel, state: TranscodeUiState) {
     // только когда разбираешь, почему задание упало.
     var logsOpen by remember { mutableStateOf(false) }
 
-    // Папка вывода: по умолчанию app-specific dir, её можно заменить
+    // Папка вывода: по умолчанию Movies/eBrake, её можно заменить
     // на любую из хранилища. Выбор уходит в сервис, он переживает Activity.
     val folderPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),

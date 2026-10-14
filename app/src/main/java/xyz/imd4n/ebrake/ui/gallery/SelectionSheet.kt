@@ -3,6 +3,7 @@ package xyz.imd4n.ebrake.ui.gallery
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,6 +59,7 @@ import xyz.imd4n.ebrake.R
 import xyz.imd4n.ebrake.transcode.SelectedInput
 import xyz.imd4n.ebrake.transcode.TranscodeFormat
 import xyz.imd4n.ebrake.transcode.TranscodeFormat.formatBytes
+import xyz.imd4n.ebrake.ui.DockMetrics
 import xyz.imd4n.ebrake.ui.PreviewPlayerHolder
 import xyz.imd4n.ebrake.ui.PreviewPlayerSurface
 
@@ -65,8 +67,10 @@ import xyz.imd4n.ebrake.ui.PreviewPlayerSurface
  * Плавающая сводка отбора: «Выбрано N роликов · общий размер X МБ» и карусель
  * маленьких превью. Лежит над доком с полями по бокам.
  *
- * Стеклянная, чуть темнее дока: тот же Haze-эффект, но фон плотнее, чтобы
- * две стеклянные панели друг над другом не сливались в одну.
+ * Стекло — то же, что у дока: те же плотность фона, размытие, тень, бордер и
+ * радиус из [DockMetrics]. Раньше у карточки были свои числа (0.80 / 16.dp /
+ * 14.dp / 18.dp) и без бордера, из-за чего она читалась как отдельная панель,
+ * а не как часть одной линейки с доком.
  *
  * Отдельный экран не нужен: отметка — это рабочее состояние, а не место, где
  * что-то происходит. Поэтому карточка поверх сетки, а не в её потоке: счётчик
@@ -83,13 +87,13 @@ fun SelectionSummaryCard(
     hazeState: HazeState? = null,
 ) {
     if (count == 0) return
-    val shape = RoundedCornerShape(SUMMARY_RADIUS)
+    val shape = RoundedCornerShape(DockMetrics.Radius)
     val glass = if (hazeState != null) {
         Modifier.hazeEffect(
             state = hazeState,
             style = HazeDefaults.style(
-                backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.80f),
-                blurRadius = SUMMARY_BLUR_RADIUS,
+                backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = DockMetrics.GlassAlpha),
+                blurRadius = DockMetrics.BlurRadius,
             ),
         )
     } else {
@@ -98,11 +102,13 @@ fun SelectionSummaryCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(14.dp, shape, clip = false)
+            .shadow(DockMetrics.Shadow, shape, clip = false)
             .clip(shape)
             .then(glass)
+            // Тонкая светлая кромка — та же, что у пилюли дока.
+            .border(1.dp, Color.White.copy(alpha = 0.10f), shape)
             .clickable(onClick = onOpen)
-            .padding(vertical = 10.dp, horizontal = 14.dp),
+            .padding(vertical = 12.dp, horizontal = 18.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Column {
@@ -113,10 +119,11 @@ fun SelectionSummaryCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = stringResource(
-                    if (totalBytes > 0) R.string.selected_total_size else R.string.selected_size_unknown,
-                    *arrayOf(formatBytes(LocalContext.current, totalBytes)),
-                ),
+                text = if (totalBytes > 0) {
+                    stringResource(R.string.selected_total_size, formatBytes(LocalContext.current, totalBytes))
+                } else {
+                    stringResource(R.string.selected_size_unknown)
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -493,11 +500,7 @@ private val SHEET_CHECK_SIZE = 22.dp
 /** Запас вокруг галочки до кликабельной области — попадать пальцем легче. */
 private val CHECK_TOUCH = 10.dp
 
-private val SUMMARY_RADIUS = 18.dp
 private val SHEET_CORNER = 10.dp
-
-/** Размытие под карточкой отбора. Меньше, чем у дока: панель меньше. */
-private val SUMMARY_BLUR_RADIUS = 16.dp
 
 private const val MIN_SHEET_COVER_PX = 200
 private const val MAX_SHEET_COVER_PX = 640

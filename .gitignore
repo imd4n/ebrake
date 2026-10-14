@@ -40,3 +40,6 @@ desktop.ini
 # собранный из исходников. ffmpeg-kit-next не публикуется в Maven, поэтому без
 # этого файла `./gradlew assembleDebug` упадёт с «Could not find com.arthenica».
 # Если AAR не нужен и хочется убрать 8.5 МБ из истории — см. docs/FFMPEG_KIT_NEXT.md.
+
+# Исходники шрифта Unbounded: нарезанные начертания живут в app/src/main/res/font
+Unbounded/

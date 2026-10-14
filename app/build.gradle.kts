@@ -51,8 +51,8 @@ android {
         // versionCode растёт монотонно и никогда не переиспользуется: по нему
         // F-Droid и Google Play отслеживают обновления, по нему же Android
         // понимает «обновление», а не «другое приложение».
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

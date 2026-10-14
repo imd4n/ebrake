@@ -169,7 +169,7 @@ class TranscodeService : Service() {
         // Размер исходника — база для экономии в выполненной очереди.
         val inputBytes = InputTarget.sizeOf(applicationContext, job.inputUri)
         TranscodeQueue.update(job.id) { it.copy(inputSizeBytes = inputBytes) }
-        // Приёмник: папка, выбранная пользователем, либо app-specific dir.
+        // Приёмник: папка пользователя либо Movies/eBrake по умолчанию.
         val out = OutputTarget.prepare(
             applicationContext,
             "ebrake_${job.id}_${engine.ffmpegVideoCodec}_${job.preset.compareLevel.name.lowercase()}.mp4",
@@ -192,6 +192,7 @@ class TranscodeService : Service() {
                 // Для SAF «файл существует» — это stat по документу, а не File.exists().
                 val size = if (ReturnCode.isSuccess(rc)) out.size(applicationContext) else 0L
                 if (ReturnCode.isSuccess(rc) && size > 0) {
+                    OutputTarget.complete(applicationContext, out, true)
                     val finished = job.copy(
                         status = JobStatus.DONE,
                         progress01 = 1f,
@@ -224,10 +225,14 @@ class TranscodeService : Service() {
                         ),
                     )
                 } else if (ReturnCode.isCancel(rc)) {
+                    // Недописанный MediaStore-файл удаляем, чтобы не копились
+                    // пустые «Movies/eBrake/ebrake_*». Задание — обратно в очередь.
+                    OutputTarget.complete(applicationContext, out, false)
                     // Возвращаем в «В очереди», чтобы можно было перезапустить.
                     TranscodeQueue.update(job.id) { it.copy(status = JobStatus.QUEUED, progress01 = 0f) }
                     TranscodeQueue.appendLog(getString(R.string.log_job_cancelled, job.id))
                 } else {
+                    OutputTarget.complete(applicationContext, out, false)
                     TranscodeQueue.update(job.id) { it.copy(status = JobStatus.FAILED) }
                     TranscodeQueue.appendLog(
                         getString(
