@@ -116,7 +116,7 @@ object OutputTarget {
                 if (cursor.moveToFirst()) cursor.getString(0) else null
             }
         }.getOrNull()
-        return name ?: tree.toString()
+        return name ?: ""
     }
 
     /**
@@ -176,7 +176,9 @@ object OutputTarget {
         // Reusable — тот же SAF-фикс, что и на чтении входа: одноразовые URL
         // не открываются в executeAsync (см. ловушку в NOTES.md).
         val safUrl = FFmpegKitConfig.getSafParameterForWrite(context, doc, true)
-        return Target.Saf(doc, safUrl, doc.toString())
+        val folder = label(context)
+        val display = if (folder.isNotEmpty() && !folder.startsWith("content:")) "$folder/$fileName" else fileName
+        return Target.Saf(doc, safUrl, display)
     }
 
     /**
